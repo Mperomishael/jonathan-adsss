@@ -10,9 +10,10 @@ export async function GET(req: NextRequest) {
   }
   try {
     const wallets = await getCryptoWallets()
-    const btc = wallets.find((w) => w.type === 'BTC')
-    const usdt = wallets.find((w) => w.type === 'USDT')
-    return NextResponse.json({ btc: btc || null, usdt: usdt || null })
+    return NextResponse.json({
+      btc: wallets.btc || null,
+      usdt: wallets.usdt || null,
+    })
   } catch (error: any) {
     console.error('Get wallets error:', error)
     return NextResponse.json({ error: error.message || 'Failed to get wallets' }, { status: 500 })

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminRequest } from '@/lib/firebase-admin'
+import { verifyAdminRequest, adminDb } from '@/lib/firebase-admin'
 
 export async function GET(
   req: NextRequest,
@@ -12,7 +12,11 @@ export async function GET(
 
     const { uid } = params
 
-    const userDoc = await admin.firestore().collection('users').doc(uid).get()
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Database not initialized' }, { status: 500 })
+    }
+
+    const userDoc = await adminDb.collection('users').doc(uid).get()
 
     if (!userDoc.exists) {
       return NextResponse.json(

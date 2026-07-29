@@ -12,6 +12,10 @@ export async function GET(req: NextRequest) {
 
     console.log('[Admin API] Loading applications for:', adminEmail)
 
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Database not initialized' }, { status: 500 })
+    }
+
     // Get all card applications
     const snapshot = await adminDb.collection('cardApplications').get()
     const applications = snapshot.docs.map((doc) => ({

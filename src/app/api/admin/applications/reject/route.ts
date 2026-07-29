@@ -21,6 +21,10 @@ export async function POST(req: NextRequest) {
 
     console.log('[Admin API] Rejecting application:', email)
 
+    if (!adminDb) {
+      return NextResponse.json({ error: 'Database not initialized' }, { status: 500 })
+    }
+
     // Update application record
     await adminDb.collection('cardApplications').doc(email).update({
       status: 'rejected',

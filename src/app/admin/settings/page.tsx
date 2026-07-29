@@ -9,6 +9,9 @@ const DEFAULTS: SiteSettings = {
   announcementBar: 'Officially Licensed Jean-Claude Van Damme Merchandise',
   contactEmail: 'contact@jcvdworld.com',
   socialLinks: { facebook: '#', twitter: '#', instagram: '#', youtube: '#' },
+  whatsappNumber: '',
+  cashappHandle: '',
+  venmoHandle: '',
 }
 
 export default function AdminSettingsPage() {

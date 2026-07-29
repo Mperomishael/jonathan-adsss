@@ -27,18 +27,6 @@ export default function AdminManagementPage() {
   const [newAdminEmail, setNewAdminEmail] = useState('')
   const [adding, setAdding] = useState(false)
 
-  if (adminRole !== 'super-admin') {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Shield size={48} className="text-red-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-          <p className="text-gray-400">You need Super Admin privileges to manage admin users.</p>
-        </div>
-      </div>
-    )
-  }
-
   const loadAdmins = async () => {
     const token = await getToken()
     try {
@@ -149,28 +137,25 @@ export default function AdminManagementPage() {
   }
 
   useEffect(() => {
-    loadAdmins()
-  }, [])
+    if (adminRole === 'super-admin') {
+      loadAdmins()
+    }
+  }, [adminRole])
+
+  if (adminRole !== 'super-admin') {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Shield size={48} className="text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-gray-400">You need Super Admin privileges to manage admin users.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-black text-white mb-2">ADMIN MANAGEMENT</h1>
-            <p className="text-gray-400">Manage admin users and their permissions</p>
-          </div>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
-          >
-            <UserPlus size={16} />
-            Add Admin
-          </button>
-        </div>
-      </div>
-
-      {/* Add Admin Form */}
       {showAddForm && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}

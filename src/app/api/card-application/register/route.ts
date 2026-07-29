@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import * as admin from 'firebase-admin'
+import { adminAuth, adminDb } from '@/lib/firebase-admin'
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,10 +14,14 @@ export async function POST(req: NextRequest) {
 
     console.log('[Card Application] Registering new applicant:', email)
 
+    if (!adminAuth) {
+      throw new Error('Firebase admin auth is not initialized. Check FIREBASE_ADMIN_* environment variables.')
+    }
+
     // Check if user already exists
     let existingUser
     try {
-      existingUser = await admin.auth().getUserByEmail(email)
+      existingUser = await adminAuth.getUserByEmail(email)
       console.log('[Card Application] User already exists:', email)
       return NextResponse.json(
         { error: 'This email is already registered. Please log in instead.' },
@@ -34,7 +38,7 @@ export async function POST(req: NextRequest) {
     const tempPassword = Math.random().toString(36).slice(-12) + 'Temp1!'
 
     // Create Firebase Auth user
-    const userRecord = await admin.auth().createUser({
+    const userRecord = await adminAuth.createUser({
       email,
       password: tempPassword,
       displayName: email.split('@')[0],
@@ -43,8 +47,12 @@ export async function POST(req: NextRequest) {
 
     console.log('[Card Application] Firebase user created:', userRecord.uid)
 
+    if (!adminDb) {
+      throw new Error('Firebase admin Firestore is not initialized. Check FIREBASE_ADMIN_* environment variables.')
+    }
+
     // Create user document in Firestore
-    const userRef = admin.firestore().collection('users').doc(userRecord.uid)
+    const userRef = adminDb.collection('users').doc(userRecord.uid)
     
     await userRef.set({
       uid: userRecord.uid,
@@ -70,7 +78,7 @@ export async function POST(req: NextRequest) {
     console.log('[Card Application] User document created in Firestore')
 
     // Create card application record
-    const applicationsRef = admin.firestore().collection('cardApplications').doc(email)
+    const applicationsRef = adminDb.collection('cardApplications').doc(email)
     
     await applicationsRef.set({
       email,
