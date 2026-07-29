@@ -9,18 +9,7 @@ const nextConfig = {
   },
 
   async redirects() {
-    return [
-      {
-        source: '/admin/:path*',
-        destination: 'https://admin.jonathanroumie.site/:path*',
-        permanent: true,
-      },
-      {
-        source: '/admin',
-        destination: 'https://admin.jonathanroumie.site',
-        permanent: true,
-      },
-    ]
+    return []
   },
 
   async rewrites() {
