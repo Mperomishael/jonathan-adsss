@@ -7,8 +7,10 @@ import { useAdminAuth } from '@/components/admin/AdminAuthProvider'
 import { useRouter } from 'next/navigation'
 
 export default function AdminLoginPage() {
-  const { loginWithGoogle, loading, error, clearError, user, adminRole } = useAdminAuth()
+  const { loginWithGoogle, loginWithEmailPassword, loading, error, clearError, user, adminRole } = useAdminAuth()
   const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // If already authenticated, redirect immediately
@@ -22,6 +24,17 @@ export default function AdminLoginPage() {
       await loginWithGoogle()
     } catch (e) {
       console.error('[Admin Login] Google login failed:', e)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleEmailLogin = async () => {
+    setIsSubmitting(true)
+    try {
+      await loginWithEmailPassword(email.trim(), password)
+    } catch (e) {
+      console.error('[Admin Login] Email login failed:', e)
     } finally {
       setIsSubmitting(false)
     }
@@ -70,7 +83,7 @@ export default function AdminLoginPage() {
           {isLoading ? (
             <div className="flex flex-col items-center gap-3 py-4">
               <Loader2 size={28} className="text-red-500 animate-spin" />
-              <p className="text-gray-400 text-sm text-center">Authenticating with Google...</p>
+              <p className="text-gray-400 text-sm text-center">Authenticating...</p>
             </div>
           ) : (
             <button
@@ -83,8 +96,39 @@ export default function AdminLoginPage() {
             </button>
           )}
 
+          <div className="relative py-4">
+            <div className="absolute inset-x-0 top-1/2 border-t border-white/10" />
+            <div className="relative bg-black px-4 text-center text-gray-400 text-xs uppercase tracking-[0.35em]">
+              or sign in with email
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="Admin email"
+              className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:border-white focus:outline-none"
+            />
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Password"
+              className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:border-white focus:outline-none"
+            />
+            <button
+              onClick={handleEmailLogin}
+              disabled={isLoading || !email.trim() || !password}
+              className="w-full bg-red-600 text-white py-3 rounded-lg font-bold tracking-wide hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Sign In with Email
+            </button>
+          </div>
+
           <p className="text-center text-gray-600 text-xs">
-            Only authorized Google accounts can access this panel.
+            Authorized admin emails only.
           </p>
         </div>
       </motion.div>

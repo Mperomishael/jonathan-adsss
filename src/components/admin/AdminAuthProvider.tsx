@@ -4,6 +4,7 @@ import { createContext, useContext, ReactNode, useState, useEffect } from 'react
 import { 
   signInWithPopup, 
   GoogleAuthProvider,
+  signInWithEmailAndPassword,
   signOut, 
   onAuthStateChanged,
   AuthError
@@ -25,6 +26,7 @@ interface AdminAuthCtx {
   loading: boolean
   error: string | null
   loginWithGoogle: () => Promise<void>
+  loginWithEmailPassword: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   clearError: () => void
   getToken: () => Promise<string | null>
@@ -104,6 +106,28 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const loginWithEmailPassword = async (email: string, password: string) => {
+    setError(null)
+    try {
+      if (!auth) throw new Error('Firebase not initialized')
+      
+      const result = await signInWithEmailAndPassword(auth, email, password)
+      
+      if (!result.user.email || !ALLOWED_ADMIN_EMAILS.includes(result.user.email)) {
+        await signOut(auth)
+        setError('This email is not authorized to access admin')
+        throw new Error('Unauthorized email')
+      }
+      
+      console.log('[Admin Auth] Email login successful:', result.user.email)
+    } catch (e: any) {
+      const errorMsg = e.message || 'Email login failed'
+      console.error('[Admin Auth] Email login error:', errorMsg)
+      setError(errorMsg)
+      throw e
+    }
+  }
+
   const logout = async () => {
     setLoading(true)
     try {
@@ -171,7 +195,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{
       user, adminRole, loading, error,
-      loginWithGoogle, logout, clearError: () => setError(null),
+      loginWithGoogle, loginWithEmailPassword, logout, clearError: () => setError(null),
       getToken, changePassword, isAdmin: adminRole !== null,
     }}>
       {children}
