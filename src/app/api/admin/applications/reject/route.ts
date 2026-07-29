@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import * as admin from 'firebase-admin'
+import { verifyAdminRequest, getDecodedToken, adminDb } from '@/lib/firebase-admin'
 
 export async function POST(req: NextRequest) {
   try {
-    const token = req.headers.get('Authorization')?.replace('Bearer ', '')
-    if (!token) {
+    if (!await verifyAdminRequest(req)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const decodedToken = await admin.auth().verifyIdToken(token)
-    const adminEmail = decodedToken.email
+    const decoded = await getDecodedToken(req)
+    const adminEmail = decoded?.email || 'admin@admin'
 
     const { email, uid } = await req.json()
 
@@ -23,14 +22,14 @@ export async function POST(req: NextRequest) {
     console.log('[Admin API] Rejecting application:', email)
 
     // Update application record
-    await admin.firestore().collection('cardApplications').doc(email).update({
+    await adminDb.collection('cardApplications').doc(email).update({
       status: 'rejected',
       reviewedAt: new Date().toISOString(),
       reviewedBy: adminEmail,
     })
 
     // Update user record
-    await admin.firestore().collection('users').doc(uid).update({
+    await adminDb.collection('users').doc(uid).update({
       status: 'rejected',
       approved: false,
     })

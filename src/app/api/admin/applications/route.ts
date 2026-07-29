@@ -1,21 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import * as admin from 'firebase-admin'
+import { verifyAdminRequest, getDecodedToken, adminDb } from '@/lib/firebase-admin'
 
 export async function GET(req: NextRequest) {
   try {
-    // Verify admin token
-    const token = req.headers.get('Authorization')?.replace('Bearer ', '')
-    if (!token) {
+    if (!await verifyAdminRequest(req)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const decodedToken = await admin.auth().verifyIdToken(token)
-    const adminEmail = decodedToken.email
+    const decodedToken = await getDecodedToken(req)
+    const adminEmail = decodedToken?.email || 'admin@admin'
 
     console.log('[Admin API] Loading applications for:', adminEmail)
 
     // Get all card applications
-    const snapshot = await admin.firestore().collection('cardApplications').get()
+    const snapshot = await adminDb.collection('cardApplications').get()
     const applications = snapshot.docs.map((doc) => ({
       ...doc.data(),
     }))

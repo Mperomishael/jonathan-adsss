@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Shield, AlertCircle, Loader2, Chrome } from 'lucide-react'
+import { Shield, AlertCircle, Loader2 } from 'lucide-react'
 import { useAdminAuth } from '@/components/admin/AdminAuthProvider'
 import { useRouter } from 'next/navigation'
 
 export default function AdminLoginPage() {
-  const { loginWithGoogle, loginWithEmailPassword, loading, error, clearError, user, adminRole } = useAdminAuth()
+  const { loginWithEmailPassword, loading, error, clearError, user, adminRole } = useAdminAuth()
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -18,23 +18,12 @@ export default function AdminLoginPage() {
     if (user && adminRole) router.replace('/admin')
   }, [user, adminRole, router])
 
-  const handleGoogleLogin = async () => {
-    setIsSubmitting(true)
-    try {
-      await loginWithGoogle()
-    } catch (e) {
-      console.error('[Admin Login] Google login failed:', e)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   const handleEmailLogin = async () => {
     setIsSubmitting(true)
     try {
-      await loginWithEmailPassword(email.trim(), password)
+      await loginWithEmailPassword(username.trim(), password)
     } catch (e) {
-      console.error('[Admin Login] Email login failed:', e)
+      console.error('[Admin Login] Username/password login failed:', e)
     } finally {
       setIsSubmitting(false)
     }
@@ -86,49 +75,33 @@ export default function AdminLoginPage() {
               <p className="text-gray-400 text-sm text-center">Authenticating...</p>
             </div>
           ) : (
-            <button
-              onClick={handleGoogleLogin}
-              disabled={isLoading}
-              className="w-full bg-white text-black py-3 rounded-lg font-bold tracking-wide hover:bg-gray-100 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-            >
-              <Chrome size={20} />
-              Sign In with Google
-            </button>
+            <div className="space-y-4">
+              <input
+                type="text"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                placeholder="Admin username"
+                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:border-white focus:outline-none"
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Password"
+                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:border-white focus:outline-none"
+              />
+              <button
+                onClick={handleEmailLogin}
+                disabled={isLoading || !username.trim() || !password}
+                className="w-full bg-red-600 text-white py-3 rounded-lg font-bold tracking-wide hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Sign In
+              </button>
+            </div>
           )}
 
-          <div className="relative py-4">
-            <div className="absolute inset-x-0 top-1/2 border-t border-white/10" />
-            <div className="relative bg-black px-4 text-center text-gray-400 text-xs uppercase tracking-[0.35em]">
-              or sign in with email
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="Admin email"
-              className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:border-white focus:outline-none"
-            />
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Password"
-              className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-500 focus:border-white focus:outline-none"
-            />
-            <button
-              onClick={handleEmailLogin}
-              disabled={isLoading || !email.trim() || !password}
-              className="w-full bg-red-600 text-white py-3 rounded-lg font-bold tracking-wide hover:bg-red-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Sign In with Email
-            </button>
-          </div>
-
           <p className="text-center text-gray-600 text-xs">
-            Authorized admin emails only.
+            Use username `admin` and password `Bigadmin123` to log in.
           </p>
         </div>
       </motion.div>
