@@ -32,7 +32,7 @@ export default function HeroSlider({ slides = defaultSlides }: { slides?: Slide[
   }, [nextSlide])
 
   return (
-    <div className="relative h-screen w-full overflow-hidden">
+    <div className="relative h-[80vh] sm:h-screen w-full overflow-hidden bg-black">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentSlide}
@@ -45,7 +45,7 @@ export default function HeroSlider({ slides = defaultSlides }: { slides?: Slide[
           <img
             src={slides[currentSlide].image}
             alt={slides[currentSlide].title}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain object-center"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30" />
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
