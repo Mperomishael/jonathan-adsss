@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email, currency, and amount are required' }, { status: 400 })
     }
 
-    if (!['USDT', 'BTC', 'PayPal', 'Stripe'].includes(currency)) {
+    if (!['USDT', 'BTC', 'PayPal', 'Stripe', 'Venmo', 'ChipperCash'].includes(currency)) {
       return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 })
     }
 
@@ -42,6 +42,14 @@ export async function POST(request: NextRequest) {
     } else if (currency === 'Stripe') {
       if (!methods.stripe?.enabled || !methods.stripe?.publishableKey) {
         return NextResponse.json({ error: 'Stripe payment is not currently available' }, { status: 400 })
+      }
+    } else if (currency === 'Venmo') {
+      if (!methods.venmo?.enabled || !methods.venmo?.handle) {
+        return NextResponse.json({ error: 'Venmo payment is not currently available' }, { status: 400 })
+      }
+    } else if (currency === 'ChipperCash') {
+      if (!methods.chipperCash?.enabled || !methods.chipperCash?.handle) {
+        return NextResponse.json({ error: 'Chipper Cash payment is not currently available' }, { status: 400 })
       }
     }
 

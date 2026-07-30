@@ -33,7 +33,7 @@ export function useFirestoreSync(collectionPath: string) {
       if (options.merge === false) {
         await setDoc(docRef, data)
       } else {
-        await updateDoc(docRef, data)
+        await setDoc(docRef, data, { merge: true })
       }
 
       console.log(`[Firestore] Sync successful for ${collectionPath}/${docId}`)

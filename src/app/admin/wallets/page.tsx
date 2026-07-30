@@ -47,31 +47,15 @@ export default function CryptoWalletsPage() {
     try {
       const token = await getToken()
 
-      const saves: Promise<Response>[] = []
-      if (form.btc.trim()) {
-        saves.push(
-          fetch('/api/admin/wallets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ type: 'BTC', address: form.btc.trim() }),
-          })
-        )
-      }
-      if (form.usdt.trim()) {
-        saves.push(
-          fetch('/api/admin/wallets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ type: 'USDT', address: form.usdt.trim() }),
-          })
-        )
-      }
+      const response = await fetch('/api/admin/wallets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ btc: form.btc.trim(), usdt: form.usdt.trim() }),
+      })
 
-      const results = await Promise.all(saves)
-      const failed = results.find((r) => !r.ok)
-      if (failed) {
-        const err = await failed.json()
-        throw new Error(err.error || 'Failed to save one or more wallet addresses')
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Failed to save wallet addresses')
       }
 
       setMessage({ type: 'success', text: 'Wallet addresses saved — fans will now see these on the payment page.' })

@@ -20,6 +20,8 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [paymentConfig, setPaymentConfig] = useState<any>(null)
+  const [savingPayments, setSavingPayments] = useState(false)
   
   // Password change state
   const [showPasswordForm, setShowPasswordForm] = useState(false)
@@ -41,6 +43,9 @@ export default function AdminSettingsPage() {
       const h = await hdr()
       const res = await fetch('/api/admin/settings/site', { headers: h })
       if (res.ok) setSettings(await res.json())
+      // load payment config too
+      const payRes = await fetch('/api/admin/payment-config', { headers: h })
+      if (payRes.ok) setPaymentConfig(await payRes.json())
       setLoading(false)
     }
     load()
@@ -112,6 +117,102 @@ export default function AdminSettingsPage() {
               className="w-full bg-white/5 border border-white/10 text-white px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:border-red-500 transition-colors" />
           </div>
         </section>
+
+          {/* Payment Methods */}
+          <section className="bg-white/3 border border-white/5 rounded-2xl p-6 space-y-4">
+            <h2 className="text-white text-sm font-bold tracking-widest border-b border-white/5 pb-3">PAYMENT METHODS</h2>
+            {!paymentConfig ? (
+              <p className="text-gray-400 text-sm">Loading payment configuration...</p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-gray-400 text-xs tracking-widest block mb-2">PayPal Client ID</label>
+                    <input value={paymentConfig.paypal?.clientId || ''}
+                      onChange={(e) => setPaymentConfig({ ...paymentConfig, paypal: { ...(paymentConfig.paypal || {}), clientId: e.target.value } })}
+                      className="w-full bg-white/5 border border-white/10 text-white px-3 py-2.5 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-xs tracking-widest block mb-2">Enable PayPal</label>
+                    <input type="checkbox" checked={!!paymentConfig.paypal?.enabled}
+                      onChange={(e) => setPaymentConfig({ ...paymentConfig, paypal: { ...(paymentConfig.paypal || {}), enabled: e.target.checked } })} />
+                  </div>
+
+                  <div>
+                    <label className="text-gray-400 text-xs tracking-widest block mb-2">Stripe Publishable Key</label>
+                    <input value={paymentConfig.stripe?.publishableKey || ''}
+                      onChange={(e) => setPaymentConfig({ ...paymentConfig, stripe: { ...(paymentConfig.stripe || {}), publishableKey: e.target.value } })}
+                      className="w-full bg-white/5 border border-white/10 text-white px-3 py-2.5 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-xs tracking-widest block mb-2">Enable Stripe</label>
+                    <input type="checkbox" checked={!!paymentConfig.stripe?.enabled}
+                      onChange={(e) => setPaymentConfig({ ...paymentConfig, stripe: { ...(paymentConfig.stripe || {}), enabled: e.target.checked } })} />
+                  </div>
+
+                  <div>
+                    <label className="text-gray-400 text-xs tracking-widest block mb-2">Cash App Handle</label>
+                    <input value={paymentConfig.cashapp?.handle || ''}
+                      onChange={(e) => setPaymentConfig({ ...paymentConfig, cashapp: { ...(paymentConfig.cashapp || {}), handle: e.target.value } })}
+                      className="w-full bg-white/5 border border-white/10 text-white px-3 py-2.5 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-xs tracking-widest block mb-2">Enable Cash App</label>
+                    <input type="checkbox" checked={!!paymentConfig.cashapp?.enabled}
+                      onChange={(e) => setPaymentConfig({ ...paymentConfig, cashapp: { ...(paymentConfig.cashapp || {}), enabled: e.target.checked } })} />
+                  </div>
+
+                  <div>
+                    <label className="text-gray-400 text-xs tracking-widest block mb-2">Venmo Handle</label>
+                    <input value={paymentConfig.venmo?.handle || ''}
+                      onChange={(e) => setPaymentConfig({ ...paymentConfig, venmo: { ...(paymentConfig.venmo || {}), handle: e.target.value } })}
+                      className="w-full bg-white/5 border border-white/10 text-white px-3 py-2.5 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-xs tracking-widest block mb-2">Enable Venmo</label>
+                    <input type="checkbox" checked={!!paymentConfig.venmo?.enabled}
+                      onChange={(e) => setPaymentConfig({ ...paymentConfig, venmo: { ...(paymentConfig.venmo || {}), enabled: e.target.checked } })} />
+                  </div>
+
+                  <div>
+                    <label className="text-gray-400 text-xs tracking-widest block mb-2">Chipper Cash Handle</label>
+                    <input value={paymentConfig.chipperCash?.handle || ''}
+                      onChange={(e) => setPaymentConfig({ ...paymentConfig, chipperCash: { ...(paymentConfig.chipperCash || {}), handle: e.target.value } })}
+                      className="w-full bg-white/5 border border-white/10 text-white px-3 py-2.5 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-xs tracking-widest block mb-2">Enable Chipper Cash</label>
+                    <input type="checkbox" checked={!!paymentConfig.chipperCash?.enabled}
+                      onChange={(e) => setPaymentConfig({ ...paymentConfig, chipperCash: { ...(paymentConfig.chipperCash || {}), enabled: e.target.checked } })} />
+                  </div>
+
+                  <div>
+                    <label className="text-gray-400 text-xs tracking-widest block mb-2">Enable BTC</label>
+                    <input type="checkbox" checked={!!paymentConfig.crypto?.btc?.enabled}
+                      onChange={(e) => setPaymentConfig({ ...paymentConfig, crypto: { ...(paymentConfig.crypto || {}), btc: { ...(paymentConfig.crypto?.btc || {}), enabled: e.target.checked } } })} />
+                  </div>
+                  <div>
+                    <label className="text-gray-400 text-xs tracking-widest block mb-2">Enable USDT</label>
+                    <input type="checkbox" checked={!!paymentConfig.crypto?.usdt?.enabled}
+                      onChange={(e) => setPaymentConfig({ ...paymentConfig, crypto: { ...(paymentConfig.crypto || {}), usdt: { ...(paymentConfig.crypto?.usdt || {}), enabled: e.target.checked } } })} />
+                  </div>
+                </div>
+
+                <div className="pt-3">
+                  <button onClick={async () => {
+                    setSavingPayments(true)
+                    const h = await hdr()
+                    await fetch('/api/admin/payment-config', { method: 'PUT', headers: h, body: JSON.stringify(paymentConfig) })
+                    setSavingPayments(false)
+                  }}
+                    disabled={savingPayments}
+                    className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-xl text-sm font-bold tracking-wide hover:bg-purple-700 transition-colors disabled:opacity-50">
+                    {savingPayments ? 'Saving...' : 'Save Payment Methods'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
 
         {/* Social links */}
         <section className="bg-white/3 border border-white/5 rounded-2xl p-6 space-y-4">

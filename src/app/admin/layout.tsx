@@ -4,7 +4,6 @@ import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { AdminAuthProvider, useAdminAuth } from '@/components/admin/AdminAuthProvider'
-import AdminSidebar from '@/components/admin/AdminSidebar'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, adminRole, loading } = useAdminAuth()
@@ -20,10 +19,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [user, adminRole, loading, isLoginPage, router])
 
-  // Always show login page immediately
   if (isLoginPage) return <>{children}</>
 
-  // Show spinner while loading
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -35,17 +32,12 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     )
   }
 
-  // Not authenticated — redirect
   if (!user || !adminRole) return null
 
-  // Authenticated — show dashboard
   return (
-    <div className="min-h-screen bg-black flex flex-col sm:flex-row">
-      <AdminSidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="p-4 sm:p-8 mt-14 sm:mt-0">{children}</div>
-      </main>
-    </div>
+    <main className="min-h-screen bg-black text-white">
+      {children}
+    </main>
   )
 }
 

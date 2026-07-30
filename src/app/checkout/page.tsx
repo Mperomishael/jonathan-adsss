@@ -13,6 +13,8 @@ interface PaymentMethods {
   paypal?: { enabled: boolean; clientId?: string }
   stripe?: { enabled: boolean; publishableKey?: string }
   cashapp?: { enabled: boolean; handle?: string }
+  venmo?: { enabled: boolean; handle?: string }
+  chipperCash?: { enabled: boolean; handle?: string }
 }
 
 interface Wallets {
@@ -22,7 +24,7 @@ interface Wallets {
 
 export default function CheckoutPage() {
   const { user, loading, getToken } = useUserAuth()
-  const [paymentMethod, setPaymentMethod] = useState<'BTC' | 'USDT' | 'PayPal' | 'Stripe'>('USDT')
+  const [paymentMethod, setPaymentMethod] = useState<'BTC' | 'USDT' | 'PayPal' | 'Stripe' | 'Venmo' | 'ChipperCash'>('USDT')
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethods>({})
   const [dataLoading, setDataLoading] = useState(true)
   const [copied, setCopied] = useState(false)
@@ -51,6 +53,8 @@ export default function CheckoutPage() {
           if (methodsData.crypto?.usdt?.enabled && methodsData.crypto?.usdt?.address) methods.push('USDT')
           if (methodsData.paypal?.enabled && methodsData.paypal?.clientId) methods.push('PayPal')
           if (methodsData.stripe?.enabled && methodsData.stripe?.publishableKey) methods.push('Stripe')
+          if (methodsData.venmo?.enabled && methodsData.venmo?.handle) methods.push('Venmo')
+          if (methodsData.chipperCash?.enabled && methodsData.chipperCash?.handle) methods.push('ChipperCash')
           setAvailableMethods(methods)
           
           // Set first available method as default
@@ -169,7 +173,7 @@ export default function CheckoutPage() {
                   availableMethods.map((method) => (
                     <button
                       key={method}
-                      onClick={() => setPaymentMethod(method as 'BTC' | 'USDT' | 'PayPal' | 'Stripe')}
+                      onClick={() => setPaymentMethod(method as any)}
                       className={`w-full flex items-center gap-3 p-3 sm:p-4 rounded-lg border transition-colors text-sm sm:text-base ${
                         paymentMethod === method
                           ? 'bg-red-900/20 border-red-600/50 text-red-400'
@@ -287,6 +291,40 @@ export default function CheckoutPage() {
                   ) : (
                     <p className="text-gray-400">Wallet not configured. Please select a different payment method.</p>
                   )}
+
+                  {/* Venmo */}
+                  {paymentMethod === 'Venmo' && paymentMethods.venmo?.enabled ? (
+                    <>
+                      <h3 className="text-white font-bold tracking-widest text-sm mb-3">SEND VIA VENMO</h3>
+                      <div className="bg-white/5 border border-white/10 rounded-lg p-4 font-mono text-sm text-gray-300 break-all mb-3">
+                        {paymentMethods.venmo?.handle}
+                      </div>
+                      <button onClick={() => handleCopyAddress(paymentMethods.venmo?.handle || '')} className="flex items-center gap-2 text-xs bg-white/10 hover:bg-white/20 text-gray-300 px-3 py-2 rounded-lg transition-colors">
+                        {copied ? <Check size={14} /> : <Copy size={14} />}
+                        {copied ? 'Copied!' : 'Copy Venmo Handle'}
+                      </button>
+                      <div className="bg-green-900/10 border border-green-800/20 rounded-lg p-3 mt-4 text-sm text-green-200">
+                        Send the payment via Venmo to the handle above and then mark your payment as sent. Admin will verify and confirm.
+                      </div>
+                    </>
+                  ) : null}
+
+                  {/* Chipper Cash */}
+                  {paymentMethod === 'ChipperCash' && paymentMethods.chipperCash?.enabled ? (
+                    <>
+                      <h3 className="text-white font-bold tracking-widest text-sm mb-3">SEND VIA CHIPPER CASH</h3>
+                      <div className="bg-white/5 border border-white/10 rounded-lg p-4 font-mono text-sm text-gray-300 break-all mb-3">
+                        {paymentMethods.chipperCash?.handle}
+                      </div>
+                      <button onClick={() => handleCopyAddress(paymentMethods.chipperCash?.handle || '')} className="flex items-center gap-2 text-xs bg-white/10 hover:bg-white/20 text-gray-300 px-3 py-2 rounded-lg transition-colors">
+                        {copied ? <Check size={14} /> : <Copy size={14} />}
+                        {copied ? 'Copied!' : 'Copy Chipper Cash Handle'}
+                      </button>
+                      <div className="bg-green-900/10 border border-green-800/20 rounded-lg p-3 mt-4 text-sm text-green-200">
+                        Send the payment via Chipper Cash to the handle above and then mark your payment as sent. Admin will verify and confirm.
+                      </div>
+                    </>
+                  ) : null}
 
                   {(paymentMethod === 'USDT' || paymentMethod === 'BTC') && (
                     <button
