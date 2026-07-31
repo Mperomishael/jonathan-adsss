@@ -2,13 +2,9 @@
 
 import { createContext, useContext, ReactNode, useState, useEffect } from 'react'
 
-const ADMIN_USERNAME = 'admin'
-const ADMIN_PASSWORD = 'Bigadmin123'
-const ADMIN_TOKEN = 'admin-session-token-v1'
 const ADMIN_STORAGE_KEY = 'adminSessionToken'
-const ADMIN_EMAIL = 'admin@admin'
+const ADMIN_TOKEN = 'admin-session-token-v1'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 type AdminRole = 'super-admin' | 'admin' | 'moderator' | null
 
 interface AdminAuthCtx {
@@ -45,9 +41,10 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null)
 
   useEffect(() => {
-    const storedToken = typeof window !== 'undefined' ? localStorage.getItem(ADMIN_STORAGE_KEY) : null
+    const storedToken =
+      typeof window !== 'undefined' ? localStorage.getItem(ADMIN_STORAGE_KEY) : null
     if (storedToken === ADMIN_TOKEN) {
-      setUser({ username: ADMIN_USERNAME, email: ADMIN_EMAIL })
+      setUser({ username: 'admin', email: 'admin@admin' })
       setAdminRole('super-admin')
       setToken(ADMIN_TOKEN)
     }
@@ -56,64 +53,59 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithEmailPassword = async (username: string, password: string) => {
     setError(null)
-    try {
-      if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
-        setError('Invalid admin username or password')
-        throw new Error('Invalid credentials')
-      }
-
-      setUser({ username: ADMIN_USERNAME, email: ADMIN_EMAIL })
-      setAdminRole('super-admin')
-      setToken(ADMIN_TOKEN)
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(ADMIN_STORAGE_KEY, ADMIN_TOKEN)
-      }
-    } catch (e: any) {
-      const errorMsg = e.message || 'Login failed'
-      console.error('[Admin Auth] Email login error:', errorMsg)
-      setError(errorMsg)
-      throw e
+    const res = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const msg = data.error || 'Invalid credentials'
+      setError(msg)
+      throw new Error(msg)
+    }
+    setUser(data.user)
+    setAdminRole(data.role || 'super-admin')
+    setToken(data.token)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(ADMIN_STORAGE_KEY, data.token)
     }
   }
 
   const logout = async () => {
     setLoading(true)
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(ADMIN_STORAGE_KEY)
-      }
+      if (typeof window !== 'undefined') localStorage.removeItem(ADMIN_STORAGE_KEY)
       setUser(null)
       setAdminRole(null)
       setToken(null)
       setError(null)
-    } catch (e: any) {
-      console.error('[Admin Auth] Logout error:', e.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const getToken = async () => {
-    return token
-  }
+  const getToken = async () => token
 
-  const changePassword = async (_currentPassword: string, _newPassword: string) => {
+  const changePassword = async () => {
     throw new Error('Password change is not supported in this admin mode')
   }
 
   return (
-    <Ctx.Provider value={{
-      user,
-      adminRole,
-      loading,
-      error,
-      loginWithEmailPassword,
-      logout,
-      clearError: () => setError(null),
-      getToken,
-      changePassword,
-      isAdmin: adminRole !== null,
-    }}>
+    <Ctx.Provider
+      value={{
+        user,
+        adminRole,
+        loading,
+        error,
+        loginWithEmailPassword,
+        logout,
+        clearError: () => setError(null),
+        getToken,
+        changePassword,
+        isAdmin: adminRole !== null,
+      }}
+    >
       {children}
     </Ctx.Provider>
   )
