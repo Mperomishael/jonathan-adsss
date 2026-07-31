@@ -3,12 +3,15 @@
  * Collections: products | gallery | pageSettings (fanCard, site, cryptoWallets) | settings | payments | users | admins
  *
  * Price conventions:
- * - Product.price  → DOLLARS (e.g. 29.99)
- * - FanCardSettings.price → CENTS (e.g. 5000 = $50.00)
+ * - Product.price           → DOLLARS (e.g. 29.99)
+ * - FanCardSettings.price  → CENTS (e.g. 5000 = $50.00)
+ * - FanCardSettings.tiers.*.price → CENTS
  */
 import { adminDb } from './firebase-admin'
 
 export { adminDb }
+
+// ─── Core types ───────────────────────────────────────────────────────────────
 
 export interface Product {
   id: string
@@ -30,13 +33,26 @@ export interface GalleryImage {
   createdAt: string
 }
 
+export type FanTierId = 'regular' | 'gold' | 'diamond'
+
+export interface FanTierConfig {
+  enabled: boolean
+  price: number // cents
+  label: string
+}
+
 export interface FanCardSettings {
-  price: number // CENTS (e.g. 5000 = $50.00)
+  price: number // CENTS — legacy / regular default
   background: string
   accentColor: string
   logoUrl: string
   footerText: string
   antiScreenshot?: boolean
+  tiers?: {
+    regular: FanTierConfig
+    gold: FanTierConfig
+    diamond: FanTierConfig
+  }
   updatedAt?: string
   updatedBy?: string
 }
@@ -52,7 +68,7 @@ export interface SiteSettings {
   updatedBy?: string
 }
 
-// ─── Products ─────────────────────────────────────────────────────────────────
+// ─── DB helper ────────────────────────────────────────────────────────────────
 
 export function getDb() {
   if (!adminDb) {
@@ -60,6 +76,16 @@ export function getDb() {
   }
   return adminDb
 }
+
+/** Normalize product price to dollars. Legacy integer cents (>= 1000) converted once. */
+function normalizeProductPrice(raw: unknown): number {
+  const n = Number(raw || 0)
+  if (!Number.isFinite(n) || n < 0) return 0
+  if (Number.isInteger(n) && n >= 1000) return Math.round(n) / 100
+  return Math.round(n * 100) / 100
+}
+
+// ─── Products ─────────────────────────────────────────────────────────────────
 
 export async function getProducts(): Promise<Product[]> {
   const snap = await getDb().collection('products').orderBy('createdAt', 'desc').get()
@@ -94,14 +120,6 @@ export async function getProduct(id: string): Promise<Product | null> {
     stock: typeof data.stock === 'number' ? data.stock : data.inStock === false ? 0 : 99,
     createdAt: data.createdAt || '',
   } as Product
-}
-
-/** Normalize price to dollars. Legacy rows stored as integer cents (>= 1000) are converted once. */
-function normalizeProductPrice(raw: unknown): number {
-  const n = Number(raw || 0)
-  if (!Number.isFinite(n) || n < 0) return 0
-  if (Number.isInteger(n) && n >= 1000) return Math.round(n) / 100
-  return Math.round(n * 100) / 100
 }
 
 export async function createProduct(
@@ -156,23 +174,41 @@ export async function deleteGalleryImage(id: string): Promise<void> {
 
 // ─── Fan Card Settings ────────────────────────────────────────────────────────
 
+const DEFAULT_TIERS: {
+  regular: FanTierConfig
+  gold: FanTierConfig
+  diamond: FanTierConfig
+} = {
+  regular: { enabled: true, price: 5000, label: 'Regular Fan' },
+  gold: { enabled: true, price: 15000, label: 'Gold Fan' },
+  diamond: { enabled: true, price: 50000, label: 'Diamond Fan' },
+}
+
 const DEFAULT_FAN_CARD: FanCardSettings = {
-  price: 5000, // cents = $50.00
+  price: 5000, // cents = $50.00 (regular)
   background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)',
   accentColor: '#FF0000',
   logoUrl: '/images/jvcd-avatar.jpg',
   footerText: 'OFFICIAL JONATHAN ROUMIE WORLD FAN CARD',
   antiScreenshot: true,
+  tiers: DEFAULT_TIERS,
 }
 
 export async function getFanCardSettings(): Promise<FanCardSettings> {
   const doc = await getDb().collection('pageSettings').doc('fanCard').get()
-  if (!doc.exists) return { ...DEFAULT_FAN_CARD }
+  if (!doc.exists) {
+    return { ...DEFAULT_FAN_CARD, tiers: { ...DEFAULT_TIERS } }
+  }
   const data = doc.data() as FanCardSettings
   return {
     ...DEFAULT_FAN_CARD,
     ...data,
     antiScreenshot: data.antiScreenshot !== false,
+    tiers: {
+      regular: { ...DEFAULT_TIERS.regular, ...(data.tiers?.regular || {}) },
+      gold: { ...DEFAULT_TIERS.gold, ...(data.tiers?.gold || {}) },
+      diamond: { ...DEFAULT_TIERS.diamond, ...(data.tiers?.diamond || {}) },
+    },
   }
 }
 
@@ -206,7 +242,7 @@ export async function updateSiteSettings(data: Partial<SiteSettings>): Promise<v
   )
 }
 
-// ─── Admin ────────────────────────────────────────────────────────────────────
+// ─── Extended domain types ────────────────────────────────────────────────────
 
 export interface Admin {
   id: string
@@ -236,6 +272,7 @@ export interface User {
   fanStatus: 'pending' | 'approved' | 'rejected'
   registeredAt: string
   paymentStatus: 'unpaid' | 'pending' | 'confirmed'
+  fanTier?: FanTierId
 }
 
 export interface Payment {
@@ -246,6 +283,7 @@ export interface Payment {
   amount: number
   currency: 'USDT' | 'BTC' | 'PayPal' | 'Stripe' | 'Venmo' | 'ChipperCash' | 'CashApp'
   status: 'pending' | 'confirmed' | 'failed'
+  tier?: FanTierId
   qrCode?: string
   transactionId?: string
   shippingAddress?: string
@@ -313,7 +351,7 @@ export async function deleteAdmin(id: string): Promise<void> {
   await getDb().collection('admins').doc(id).delete()
 }
 
-// ─── Fan Card Management (catalog of card products) ───────────────────────────
+// ─── Fan Card catalog ─────────────────────────────────────────────────────────
 
 export async function getFanCards(): Promise<FanCard[]> {
   const snap = await getDb().collection('fanCards').orderBy('createdAt', 'desc').get()
