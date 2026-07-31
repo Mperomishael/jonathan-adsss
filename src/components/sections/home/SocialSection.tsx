@@ -1,15 +1,49 @@
 'use client'
+
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Facebook, Twitter, Instagram, Youtube } from 'lucide-react'
 import Image from 'next/image'
 
+const ICON_MAP = {
+  facebook: Facebook,
+  twitter: Twitter,
+  instagram: Instagram,
+  youtube: Youtube,
+} as const
+
+type Platform = keyof typeof ICON_MAP
+
 export default function SocialSection() {
-  const socialLinks = [
-    { icon: Facebook, href: '#', label: 'Facebook' },
-    { icon: Twitter, href: '#', label: 'Twitter' },
-    { icon: Instagram, href: '#', label: 'Instagram' },
-    { icon: Youtube, href: '#', label: 'YouTube' },
-  ]
+  const [links, setLinks] = useState<Record<Platform, string>>({
+    facebook: '#',
+    twitter: '#',
+    instagram: '#',
+    youtube: '#',
+  })
+
+  useEffect(() => {
+    fetch('/api/social')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setLinks({
+            facebook: data.facebook || '#',
+            twitter: data.twitter || '#',
+            instagram: data.instagram || '#',
+            youtube: data.youtube || '#',
+          })
+        }
+      })
+      .catch(console.error)
+  }, [])
+
+  const socialLinks = (Object.keys(ICON_MAP) as Platform[]).map((key) => ({
+    icon: ICON_MAP[key],
+    href: links[key],
+    label: key.charAt(0).toUpperCase() + key.slice(1),
+  }))
+
   return (
     <section className="relative py-16 px-4">
       <div className="absolute inset-0">
@@ -17,12 +51,35 @@ export default function SocialSection() {
         <div className="absolute inset-0 bg-black/50" />
       </div>
       <div className="relative z-10 flex flex-col items-center">
-        <motion.h2 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} viewport={{ once: true }} className="text-white text-center text-lg tracking-[0.4em] mb-8">
+        <motion.h2
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          viewport={{ once: true }}
+          className="text-white text-center text-lg tracking-[0.4em] mb-8"
+        >
           @JONATHAN ROUMIE SOCIAL
         </motion.h2>
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} viewport={{ once: true }} className="flex gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          viewport={{ once: true }}
+          className="flex gap-6"
+        >
           {socialLinks.map((social, index) => (
-            <motion.a key={social.label} href={social.href} initial={{ opacity: 0, scale: 0.8 }} whileInView={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, delay: 0.3 + index * 0.1 }} viewport={{ once: true }} className="w-14 h-14 rounded-full border-2 border-white flex items-center justify-center text-white hover:bg-white hover:text-black transition-colors duration-300" aria-label={social.label}>
+            <motion.a
+              key={social.label}
+              href={social.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              initial={{ opacity: 0, scale: 0.8 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3, delay: 0.3 + index * 0.1 }}
+              viewport={{ once: true }}
+              className="w-14 h-14 rounded-full border-2 border-white flex items-center justify-center text-white hover:bg-white hover:text-black transition-colors duration-300"
+              aria-label={social.label}
+            >
               <social.icon size={24} />
             </motion.a>
           ))}
