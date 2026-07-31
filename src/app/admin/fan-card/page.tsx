@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Save, Loader2, AlertCircle, Check } from 'lucide-react'
 import { useFirestoreListener } from '@/hooks/useFirestoreListener'
-import { useFirestoreSync } from '@/hooks/useFirestoreSync'
+import { useAdminAuth } from '@/components/admin/AdminAuthProvider'
 import type { FanCardSettings, FanTierId } from '@/lib/firestore'
 
 const DEFAULT_TIERS = {
@@ -48,12 +48,13 @@ const TIER_META: Record<
 }
 
 export default function AdminFanCardPage() {
+  const { getToken } = useAdminAuth()
   const { data: firestoreSettings, loading, error: listenerError } =
     useFirestoreListener<FanCardSettings>('pageSettings', 'fanCard')
-  const { sync, isSyncing, error: syncError } = useFirestoreSync('pageSettings')
 
   const [settings, setSettings] = useState<FanCardSettings>(DEFAULTS)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
   const [previewTier, setPreviewTier] = useState<FanTierId>('regular')
 
@@ -92,6 +93,7 @@ export default function AdminFanCardPage() {
 
   const handleSave = async () => {
     setLocalError(null)
+    setSaving(true)
     try {
       const tiers = {
         regular: {
@@ -113,24 +115,45 @@ export default function AdminFanCardPage() {
 
       if (tiers.regular.price < 99 || tiers.gold.price < 99 || tiers.diamond.price < 99) {
         setLocalError('Each tier price must be at least $0.99')
+        setSaving(false)
         return
       }
 
-      await sync('fanCard', {
-        price: tiers.regular.price,
-        background: settings.background,
-        accentColor: settings.accentColor,
-        logoUrl: settings.logoUrl,
-        footerText: settings.footerText,
-        antiScreenshot: settings.antiScreenshot !== false,
-        tiers,
-        updatedAt: new Date().toISOString(),
+      const token = await getToken()
+      if (!token) {
+        throw new Error('Not authenticated. Please log in again.')
+      }
+
+      const res = await fetch('/api/admin/settings/fan-card', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          price: tiers.regular.price,
+          background: settings.background,
+          accentColor: settings.accentColor,
+          logoUrl: settings.logoUrl,
+          footerText: settings.footerText,
+          antiScreenshot: settings.antiScreenshot !== false,
+          tiers,
+          updatedAt: new Date().toISOString(),
+        }),
       })
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data.error || `Save failed (${res.status})`)
+      }
 
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (e: any) {
-      setLocalError(e?.message || 'Failed to save')
+      console.error('[Admin Fan Card] Save failed:', e)
+      setLocalError(e?.message || 'Failed to save settings')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -154,10 +177,10 @@ export default function AdminFanCardPage() {
         </p>
       </div>
 
-      {(listenerError || syncError || localError) && (
+      {(listenerError || localError) && (
         <div className="flex items-center gap-3 bg-red-900/20 border border-red-800/50 rounded-lg p-4 text-red-300 mb-6 text-sm">
-          <AlertCircle size={18} />
-          {localError || syncError || listenerError}
+          <AlertCircle size={18} className="flex-shrink-0" />
+          {localError || listenerError}
         </div>
       )}
 
@@ -168,7 +191,9 @@ export default function AdminFanCardPage() {
             type="button"
             onClick={() => setPreviewTier(id)}
             className={`px-4 py-2 rounded-lg text-xs font-bold tracking-widest ${
-              previewTier === id ? 'bg-red-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'
+              previewTier === id
+                ? 'bg-red-600 text-white'
+                : 'bg-white/5 text-gray-400 hover:bg-white/10'
             }`}
           >
             {TIER_META[id].title}
@@ -178,8 +203,11 @@ export default function AdminFanCardPage() {
 
       <div className="mb-8">
         <div
-          className="w-[340px] h-[210px] rounded-2xl overflow-hidden relative border border-white/10"
-          style={{ background: meta.previewBg, boxShadow: `0 20px 40px ${meta.accent}33` }}
+          className="w-full max-w-[340px] h-[210px] rounded-2xl overflow-hidden relative border border-white/10"
+          style={{
+            background: meta.previewBg,
+            boxShadow: `0 20px 40px ${meta.accent}33`,
+          }}
         >
           <div
             className="absolute top-0 left-0 right-0 h-1"
@@ -309,17 +337,17 @@ export default function AdminFanCardPage() {
           className="flex items-center gap-2 bg-green-900/20 border border-green-800/50 text-green-300 rounded-lg px-4 py-3 text-sm mb-4"
         >
           <Check size={16} />
-          Saved — tiers live on public fan card
+          Saved — tier prices are live on the public fan card
         </motion.div>
       )}
 
       <button
         type="button"
         onClick={handleSave}
-        disabled={isSyncing}
+        disabled={saving}
         className="flex items-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold tracking-wide hover:bg-red-700 disabled:opacity-50"
       >
-        {isSyncing ? (
+        {saving ? (
           <>
             <Loader2 size={16} className="animate-spin" /> Saving...
           </>
