@@ -15,6 +15,8 @@ import { useFirestoreListener } from '@/hooks/useFirestoreListener'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type PayMethod = 'USDT' | 'BTC' | 'Venmo' | 'ChipperCash' | 'CashApp'
+type FanTierId = 'regular' | 'gold' | 'diamond'
+type PageState = 'loading' | 'apply' | 'submitted' | 'awaiting' | 'whitelisted'
 
 interface Wallets {
   btc?: { address: string }
@@ -36,6 +38,12 @@ interface CryptoWalletsData {
   usdt?: { address: string; verified?: boolean }
 }
 
+interface FanTierConfig {
+  enabled?: boolean
+  price?: number
+  label?: string
+}
+
 interface FanCardSettingsData {
   price?: number
   antiScreenshot?: boolean
@@ -43,11 +51,48 @@ interface FanCardSettingsData {
   accentColor?: string
   logoUrl?: string
   footerText?: string
+  tiers?: {
+    regular?: FanTierConfig
+    gold?: FanTierConfig
+    diamond?: FanTierConfig
+  }
 }
 
-type PageState = 'loading' | 'apply' | 'submitted' | 'awaiting' | 'whitelisted'
+// ─── Tier styles ──────────────────────────────────────────────────────────────
 
-// ─── Name font size (prevents cutoff on card + export) ────────────────────────
+const TIER_STYLE: Record<
+  FanTierId,
+  { background: string; accent: string; badge: string }
+> = {
+  regular: {
+    background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)',
+    accent: '#FF0000',
+    badge: 'REGULAR FAN',
+  },
+  gold: {
+    background: 'linear-gradient(135deg, #1a1200 0%, #3d2e0a 35%, #c9a227 70%, #f5e6a3 100%)',
+    accent: '#D4AF37',
+    badge: 'GOLD FAN',
+  },
+  diamond: {
+    background: 'linear-gradient(135deg, #0a0f1a 0%, #1a2744 35%, #a8c0d8 65%, #e8f4ff 100%)',
+    accent: '#B9F2FF',
+    badge: 'DIAMOND FAN',
+  },
+}
+
+const UPGRADE_NEXT: Partial<Record<FanTierId, FanTierId>> = {
+  regular: 'gold',
+  gold: 'diamond',
+}
+
+const DEFAULT_TIER_PRICES: Record<FanTierId, number> = {
+  regular: 5000,
+  gold: 15000,
+  diamond: 50000,
+}
+
+// ─── Name font (prevents cutoff) ──────────────────────────────────────────────
 
 function nameFontSize(name: string): number {
   const len = name.length || 8
@@ -68,6 +113,7 @@ function FanCard3D({
   accentColor,
   logoUrl,
   footerText,
+  badge,
 }: {
   name: string
   memberId: string
@@ -77,6 +123,7 @@ function FanCard3D({
   accentColor: string
   logoUrl: string
   footerText: string
+  badge: string
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mouseX = useMotionValue(0)
@@ -123,7 +170,6 @@ function FanCard3D({
         animate={vibrating ? { x: [-3, 3, -3, 3, 0], transition: { duration: 0.25 } } : {}}
         className="relative w-[340px] h-[210px] cursor-pointer"
       >
-        {/* Capture target: flat layer, no 3D child transforms */}
         <div
           ref={cardRef}
           className="absolute inset-0 rounded-2xl overflow-hidden select-none"
@@ -134,7 +180,6 @@ function FanCard3D({
             userSelect: 'none',
           }}
         >
-          {/* Glare */}
           <motion.div
             className="absolute inset-0 opacity-30 pointer-events-none"
             style={{
@@ -142,15 +187,13 @@ function FanCard3D({
             }}
           />
 
-          {/* Top accent bar */}
           <div
             className="absolute top-0 left-0 right-0 h-1"
             style={{
-              background: `linear-gradient(to right, ${accentColor}, #f87171, ${accentColor})`,
+              background: `linear-gradient(to right, ${accentColor}, #ffffff88, ${accentColor})`,
             }}
           />
 
-          {/* Chip */}
           <div className="absolute top-5 left-5 w-10 h-7 rounded bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center">
             <div className="grid grid-cols-2 gap-0.5 opacity-60">
               {[...Array(4)].map((_, i) => (
@@ -159,7 +202,6 @@ function FanCard3D({
             </div>
           </div>
 
-          {/* Avatar */}
           <div
             className="absolute top-4 right-4 w-12 h-12 rounded-full overflow-hidden border-2"
             style={{ borderColor: `${accentColor}99` }}
@@ -167,13 +209,12 @@ function FanCard3D({
             <Image src={logoUrl} alt="Jonathan Roumie" fill className="object-cover" unoptimized />
           </div>
 
-          {/* Brand */}
           <div className="absolute top-[52px] left-5 right-16">
-            <p className="text-white/40 text-[9px] tracking-[0.3em] uppercase">Official Member</p>
+            <p className="text-white/50 text-[9px] tracking-[0.3em] uppercase">{badge}</p>
             <p className="text-white text-xs font-bold tracking-[0.25em]">JONATHAN ROUMIE</p>
           </div>
 
-          {/* Name band — reserved height so text never clips */}
+          {/* Name band — reserved height to avoid cutoff */}
           <div
             className="absolute left-5 right-5 flex items-end"
             style={{ bottom: 36, height: 36 }}
@@ -194,27 +235,23 @@ function FanCard3D({
             </p>
           </div>
 
-          {/* Footer row */}
           <div className="absolute bottom-3 left-5 right-5 flex justify-between items-center">
             <p className="text-white/40 text-[10px] tracking-widest font-mono">{memberId}</p>
             <p className="text-white/40 text-[10px] tracking-widest">{year}</p>
           </div>
 
-          {/* Optional footer label */}
           {footerText && (
             <p className="absolute bottom-[1px] left-0 right-0 text-center text-[7px] tracking-widest text-white/15 px-2 truncate">
               {footerText}
             </p>
           )}
 
-          {/* Decorative lines */}
           <svg className="absolute inset-0 w-full h-full opacity-5 pointer-events-none" viewBox="0 0 340 210">
             <line x1="0" y1="100" x2="340" y2="100" stroke="white" strokeWidth="0.5" />
             <line x1="170" y1="0" x2="170" y2="210" stroke="white" strokeWidth="0.5" />
             <circle cx="170" cy="100" r="40" stroke="white" strokeWidth="0.5" fill="none" />
           </svg>
 
-          {/* UNVERIFIED watermark — screen only until approved download */}
           {showUnverifiedWatermark && (
             <div
               className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden"
@@ -252,7 +289,6 @@ function FanCard3D({
           )}
         </div>
 
-        {/* Card thickness shadow */}
         <div
           className="absolute inset-0 rounded-2xl pointer-events-none"
           style={{
@@ -415,15 +451,19 @@ function methodActiveClass(m: PayMethod) {
 function ApplicationForm({
   wallets,
   methods,
-  price,
+  priceCents,
+  tier,
+  tierLabel,
   onSuccess,
   name,
   onNameChange,
 }: {
   wallets: Wallets
   methods: PaymentMethodsConfig
-  price: number
-  onSuccess: (email: string) => void
+  priceCents: number
+  tier: FanTierId
+  tierLabel: string
+  onSuccess: (email: string, paidTier: FanTierId) => void
   name: string
   onNameChange: (n: string) => void
 }) {
@@ -447,7 +487,7 @@ function ApplicationForm({
   }, [options.join('|')])
 
   const waybillPrice = 23.0
-  const priceUsd = (price / 100).toFixed(2)
+  const priceUsd = (priceCents / 100).toFixed(2)
   const totalPrice = addWaybill
     ? (parseFloat(priceUsd) + waybillPrice).toFixed(2)
     : priceUsd
@@ -477,13 +517,14 @@ function ApplicationForm({
           name: name.trim(),
           currency: method,
           amount: parseFloat(totalPrice),
+          tier,
           waybill: addWaybill,
           shippingAddress: addWaybill ? shippingAddress.trim() : undefined,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Submission failed')
-      onSuccess(email.toLowerCase().trim())
+      onSuccess(email.toLowerCase().trim(), tier)
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.')
     } finally {
@@ -506,7 +547,7 @@ function ApplicationForm({
       <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-5 py-4">
         <div>
           <p className="text-gray-500 text-xs tracking-widest uppercase mb-0.5">Jonathan Roumie</p>
-          <p className="text-white font-bold">Official Fan Card</p>
+          <p className="text-white font-bold">{tierLabel}</p>
         </div>
         <div className="text-right">
           <p className="text-white text-2xl font-black">${totalPrice}</p>
@@ -657,26 +698,55 @@ export default function FanCardPage() {
   const [submittedEmail, setSubmittedEmail] = useState('')
   const [wallets, setWallets] = useState<Wallets>({})
   const [payMethods, setPayMethods] = useState<PaymentMethodsConfig>({})
-  const [price, setPrice] = useState(499)
   const [cardName, setCardName] = useState('')
   const [exporting, setExporting] = useState(false)
   const [loginLoading, setLoginLoading] = useState(false)
-  /** When true, hide watermark for the export capture only */
   const [exportClean, setExportClean] = useState(false)
+  const [selectedTier, setSelectedTier] = useState<FanTierId>('regular')
+  /** Last paid / owned tier for upgrade suggestions */
+  const [ownedTier, setOwnedTier] = useState<FanTierId | null>(null)
 
   const cardRef = useRef<HTMLDivElement>(null)
   const canDownload = pageState === 'whitelisted'
 
   const antiScreenshot = fanCardSettings?.antiScreenshot !== false
-  const cardBackground =
-    fanCardSettings?.background ||
-    'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)'
-  const accentColor = fanCardSettings?.accentColor || '#FF0000'
   const logoUrl = fanCardSettings?.logoUrl || '/images/jvcd-avatar.jpg'
   const footerText =
     fanCardSettings?.footerText || 'OFFICIAL JONATHAN ROUMIE WORLD FAN CARD'
 
-  // Preview always watermarked until verified; clean only during approved export
+  const tiers: Record<FanTierId, { enabled: boolean; price: number; label: string }> = {
+    regular: {
+      enabled: fanCardSettings?.tiers?.regular?.enabled !== false,
+      price: Number(
+        fanCardSettings?.tiers?.regular?.price ??
+          fanCardSettings?.price ??
+          DEFAULT_TIER_PRICES.regular
+      ),
+      label: fanCardSettings?.tiers?.regular?.label || 'Regular Fan',
+    },
+    gold: {
+      enabled: fanCardSettings?.tiers?.gold?.enabled !== false,
+      price: Number(fanCardSettings?.tiers?.gold?.price ?? DEFAULT_TIER_PRICES.gold),
+      label: fanCardSettings?.tiers?.gold?.label || 'Gold Fan',
+    },
+    diamond: {
+      enabled: fanCardSettings?.tiers?.diamond?.enabled !== false,
+      price: Number(fanCardSettings?.tiers?.diamond?.price ?? DEFAULT_TIER_PRICES.diamond),
+      label: fanCardSettings?.tiers?.diamond?.label || 'Diamond Fan',
+    },
+  }
+
+  // Ensure selected tier is enabled
+  useEffect(() => {
+    if (!tiers[selectedTier].enabled) {
+      const first = (['regular', 'gold', 'diamond'] as FanTierId[]).find((id) => tiers[id].enabled)
+      if (first) setSelectedTier(first)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fanCardSettings])
+
+  const activeStyle = TIER_STYLE[selectedTier]
+  const activePrice = tiers[selectedTier].price
   const showUnverifiedWatermark = !canDownload || !exportClean
 
   const memberId = `JR-${Math.abs(
@@ -686,7 +756,22 @@ export default function FanCardPage() {
     .slice(0, 6)
     .padStart(6, '0')}`
 
-  // ── Anti-screenshot (admin toggle) ─────────────────────────────────────────
+  // Persist owned tier locally after verification
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const stored = localStorage.getItem('fanCardOwnedTier') as FanTierId | null
+    if (stored && ['regular', 'gold', 'diamond'].includes(stored)) {
+      setOwnedTier(stored)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (pageState === 'whitelisted' && ownedTier) {
+      localStorage.setItem('fanCardOwnedTier', ownedTier)
+    }
+  }, [pageState, ownedTier])
+
+  // Anti-screenshot
   useEffect(() => {
     if (!antiScreenshot) return
 
@@ -694,12 +779,10 @@ export default function FanCardPage() {
     const blockSelect = (e: Event) => e.preventDefault()
     const blockDrag = (e: Event) => e.preventDefault()
     const onKeyDown = (e: KeyboardEvent) => {
-      // PrintScreen / some capture shortcuts
       if (e.key === 'PrintScreen') {
         e.preventDefault()
         navigator.clipboard?.writeText?.('').catch(() => {})
       }
-      // Ctrl/Cmd + S / P common save/print
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'p')) {
         e.preventDefault()
       }
@@ -709,8 +792,6 @@ export default function FanCardPage() {
     document.addEventListener('selectstart', blockSelect)
     document.addEventListener('dragstart', blockDrag)
     document.addEventListener('keydown', onKeyDown)
-
-    // Soft CSS lock
     const prevUserSelect = document.body.style.userSelect
     document.body.style.userSelect = 'none'
 
@@ -723,7 +804,6 @@ export default function FanCardPage() {
     }
   }, [antiScreenshot])
 
-  // Wallets from Firestore
   useEffect(() => {
     if (firestoreWallets) {
       const next: Wallets = {}
@@ -733,14 +813,6 @@ export default function FanCardPage() {
     }
   }, [firestoreWallets])
 
-  // Price (cents)
-  useEffect(() => {
-    if (fanCardSettings?.price !== undefined) {
-      setPrice(Number(fanCardSettings.price) || 499)
-    }
-  }, [fanCardSettings])
-
-  // Payment methods API
   useEffect(() => {
     fetch('/api/checkout/payment-methods')
       .then((r) => (r.ok ? r.json() : null))
@@ -755,7 +827,6 @@ export default function FanCardPage() {
       .catch(console.error)
   }, [])
 
-  // Auth state
   useEffect(() => {
     if (authLoading) {
       setPageState('loading')
@@ -764,6 +835,10 @@ export default function FanCardPage() {
     if (user) {
       if (whitelisted) {
         setPageState('whitelisted')
+        if (!ownedTier) {
+          const stored = localStorage.getItem('fanCardOwnedTier') as FanTierId | null
+          setOwnedTier(stored && ['regular', 'gold', 'diamond'].includes(stored) ? stored : 'regular')
+        }
       } else {
         ;(async () => {
           try {
@@ -796,8 +871,10 @@ export default function FanCardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, whitelisted])
 
-  const handlePaymentSuccess = async (email: string) => {
+  const handlePaymentSuccess = async (email: string, paidTier: FanTierId) => {
     setSubmittedEmail(email)
+    setOwnedTier(paidTier)
+    localStorage.setItem('fanCardOwnedTier', paidTier)
     setPageState('submitted')
     setTimeout(async () => {
       try {
@@ -817,7 +894,6 @@ export default function FanCardPage() {
     }
   }
 
-  /** Export verified card only — no watermark, name fully visible */
   const handleExport = async () => {
     if (!cardName.trim()) {
       alert('Enter your name to engrave on the card first.')
@@ -833,8 +909,6 @@ export default function FanCardPage() {
 
     setExporting(true)
     setExportClean(true)
-
-    // Wait for React to re-render without watermark
     await new Promise((r) => setTimeout(r, 120))
 
     try {
@@ -848,7 +922,6 @@ export default function FanCardPage() {
         useCORS: true,
         allowTaint: true,
         logging: false,
-        // Capture exact card box — avoids clipping name/footer
         width: node.offsetWidth,
         height: node.offsetHeight,
         windowWidth: node.offsetWidth,
@@ -856,14 +929,15 @@ export default function FanCardPage() {
       })
 
       const imgData = canvas.toDataURL('image/png')
-      // ISO ID-1: 85.60 × 53.98 mm
       const pdf = new jsPDF({
         orientation: 'landscape',
         unit: 'mm',
         format: [85.6, 53.98],
       })
       pdf.addImage(imgData, 'PNG', 0, 0, 85.6, 53.98)
-      pdf.save(`JonathanRoumie-Fan-Card-${cardName.replace(/\s+/g, '-')}.pdf`)
+      pdf.save(
+        `JonathanRoumie-${selectedTier}-Fan-Card-${cardName.replace(/\s+/g, '-')}.pdf`
+      )
     } catch (err) {
       console.error(err)
       alert('Export failed. Please try again.')
@@ -873,15 +947,20 @@ export default function FanCardPage() {
     }
   }
 
+  const nextUpgrade = ownedTier ? UPGRADE_NEXT[ownedTier] : null
+  const canSuggestUpgrade =
+    !!nextUpgrade && tiers[nextUpgrade].enabled && (pageState === 'whitelisted' || pageState === 'awaiting')
+
   const cardProps = {
     name: cardName,
     memberId,
     cardRef,
     showUnverifiedWatermark,
-    background: cardBackground,
-    accentColor,
+    background: activeStyle.background,
+    accentColor: activeStyle.accent,
     logoUrl,
     footerText,
+    badge: activeStyle.badge,
   }
 
   return (
@@ -902,8 +981,8 @@ export default function FanCardPage() {
               FAN CARD
             </h2>
             <p className="text-gray-400 max-w-2xl mx-auto text-base leading-relaxed">
-              Own an exclusive personalized fan card. Engrave your name, complete payment, and receive your
-              digital card after verification.
+              Choose Regular, Gold, or Diamond membership. Each tier has its own card design and price set by
+              admin.
             </p>
             {antiScreenshot && (
               <p className="text-yellow-600/80 text-xs mt-3 tracking-wide">
@@ -914,6 +993,35 @@ export default function FanCardPage() {
         </section>
 
         <div className="px-4 max-w-7xl mx-auto">
+          {/* Tier picker */}
+          {(pageState === 'apply' || pageState === 'whitelisted') && (
+            <div className="max-w-2xl mx-auto mb-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {(['regular', 'gold', 'diamond'] as FanTierId[]).map((id) => {
+                if (!tiers[id].enabled) return null
+                const selected = selectedTier === id
+                const style = TIER_STYLE[id]
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setSelectedTier(id)}
+                    className={`rounded-xl border p-4 text-left transition-all ${
+                      selected
+                        ? 'border-white/40 bg-white/10 ring-1 ring-white/30'
+                        : 'border-white/10 bg-white/5 hover:bg-white/8'
+                    }`}
+                  >
+                    <p className="text-[10px] tracking-widest text-white/50 mb-1">{style.badge}</p>
+                    <p className="text-white font-bold text-sm">{tiers[id].label}</p>
+                    <p className="text-lg font-black mt-2" style={{ color: style.accent }}>
+                      ${(tiers[id].price / 100).toFixed(2)}
+                    </p>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
           {(pageState === 'apply' || pageState === 'whitelisted') && (
             <section className="mb-12">
               <FanCard3D {...cardProps} />
@@ -951,7 +1059,9 @@ export default function FanCardPage() {
                 <ApplicationForm
                   wallets={wallets}
                   methods={payMethods}
-                  price={price}
+                  priceCents={activePrice}
+                  tier={selectedTier}
+                  tierLabel={tiers[selectedTier].label}
                   onSuccess={handlePaymentSuccess}
                   name={cardName}
                   onNameChange={setCardName}
@@ -966,8 +1076,11 @@ export default function FanCardPage() {
                 <CheckCircle size={48} className="text-green-400 mx-auto" />
                 <div>
                   <h3 className="text-2xl font-bold text-white mb-2">Payment Submitted!</h3>
-                  <p className="text-green-300 mb-4">
+                  <p className="text-green-300 mb-2">
                     Request received for <span className="font-bold">{cardName}</span>
+                  </p>
+                  <p className="text-white/70 text-sm mb-4">
+                    Tier: <span className="font-semibold text-white">{tiers[selectedTier].label}</span>
                   </p>
                   <p className="text-gray-400 text-sm">
                     Admin will verify shortly. Email:{' '}
@@ -988,7 +1101,7 @@ export default function FanCardPage() {
           )}
 
           {pageState === 'awaiting' && (
-            <section className="max-w-2xl mx-auto">
+            <section className="max-w-2xl mx-auto space-y-6">
               <div className="bg-blue-900/20 border border-blue-800/50 rounded-2xl p-8 text-center space-y-6">
                 <Clock size={48} className="text-blue-400 mx-auto" />
                 <div>
@@ -1014,7 +1127,7 @@ export default function FanCardPage() {
                 <CheckCircle size={32} className="text-green-400 mx-auto mb-2" />
                 <h3 className="text-white font-bold">Payment Verified!</h3>
                 <p className="text-green-300 text-sm mt-1">
-                  You can download a clean official card (no watermark).
+                  Download a clean official {tiers[selectedTier].label} card (no watermark).
                 </p>
               </div>
               <input
@@ -1041,6 +1154,38 @@ export default function FanCardPage() {
               >
                 Sign Out
               </button>
+            </section>
+          )}
+
+          {/* Upgrade path */}
+          {canSuggestUpgrade && nextUpgrade && (
+            <section className="max-w-md mx-auto mt-10">
+              <div className="rounded-xl border border-yellow-600/40 bg-yellow-950/20 p-5 text-center space-y-3">
+                <p className="text-yellow-300 text-sm font-bold tracking-widest">UPGRADE AVAILABLE</p>
+                <p className="text-gray-300 text-sm">
+                  You&apos;re a{' '}
+                  <span className="text-white font-semibold">
+                    {tiers[ownedTier || 'regular'].label}
+                  </span>
+                  . Step up to{' '}
+                  <span className="text-white font-semibold">{tiers[nextUpgrade].label}</span> for a
+                  premium card design.
+                </p>
+                <p className="text-xl font-black" style={{ color: TIER_STYLE[nextUpgrade].accent }}>
+                  ${(tiers[nextUpgrade].price / 100).toFixed(2)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedTier(nextUpgrade)
+                    setPageState('apply')
+                  }}
+                  className="w-full py-3 rounded-xl font-bold tracking-widest text-black"
+                  style={{ background: TIER_STYLE[nextUpgrade].accent }}
+                >
+                  UPGRADE TO {TIER_STYLE[nextUpgrade].badge}
+                </button>
+              </div>
             </section>
           )}
 
