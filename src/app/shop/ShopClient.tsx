@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { ShoppingCart, X, Heart, Loader2 } from 'lucide-react'
+import { ShoppingCart, X, Heart, Loader2, Copy, Check } from 'lucide-react'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 
@@ -51,6 +51,62 @@ const productDefaults: Product[] = [
   { id: 13, image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.30_(3).jpeg', name: 'Signature Hoodie Premium', price: 69.99, stock: 12, description: 'Luxury Line' },
 ]
 
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.left = '-9999px'
+    document.body.appendChild(ta)
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
+
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const onCopy = async () => {
+    const ok = await copyToClipboard(value)
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } else {
+      alert('Copy failed — long-press the text and copy manually.')
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+        copied
+          ? 'bg-green-900/40 border border-green-600/50 text-green-300'
+          : 'bg-white/10 border border-white/15 text-gray-200 hover:bg-white/15'
+      }`}
+    >
+      {copied ? (
+        <>
+          <Check size={14} /> Copied!
+        </>
+      ) : (
+        <>
+          <Copy size={14} /> Copy
+        </>
+      )}
+    </button>
+  )
+}
+
 export default function ShopClient() {
   const [products, setProducts] = useState<Product[]>(productDefaults)
   const [cart, setCart] = useState<CartItem[]>([])
@@ -72,9 +128,7 @@ export default function ShopClient() {
 
   const [paymentMethod, setPaymentMethod] = useState<ShopPayMethod>('')
   const [cryptoType, setCryptoType] = useState<'btc' | 'usdt' | ''>('')
-  const [paymentConfirmed, setPaymentConfirmed] = useState(false)
 
-  // Products from API
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -88,7 +142,12 @@ export default function ShopClient() {
                 image: product.image || shopHeroImage,
                 name: product.name,
                 price: Number(product.price || 0),
-                stock: product.stock ?? product.inStock === false ? 0 : product.stock || 99,
+                stock:
+                  typeof product.stock === 'number'
+                    ? product.stock
+                    : product.inStock === false
+                      ? 0
+                      : 99,
                 description: product.description || 'Exclusive Jonathan Roumie merchandise',
                 category: product.category,
               }))
@@ -107,7 +166,6 @@ export default function ShopClient() {
     return () => clearInterval(interval)
   }, [])
 
-  // Payment methods + wallets from admin (Firestore via public API)
   useEffect(() => {
     const loadPayConfig = async () => {
       try {
@@ -140,10 +198,18 @@ export default function ShopClient() {
         ? payConfig.crypto?.usdt?.address || ''
         : ''
 
+  const activeHandle =
+    paymentMethod === 'cashapp'
+      ? payConfig.cashapp?.handle || ''
+      : paymentMethod === 'venmo'
+        ? payConfig.venmo?.handle || ''
+        : paymentMethod === 'chipper'
+          ? payConfig.chipperCash?.handle || ''
+          : ''
+
   const addToCart = (product: Product) => {
     const quantity = selectedQuantity[product.id] || 1
     const existingItem = cart.find((item) => item.id === product.id)
-
     if (existingItem) {
       setCart(
         cart.map((item) =>
@@ -197,7 +263,6 @@ export default function ShopClient() {
   const handlePaymentMethodSelect = (method: ShopPayMethod) => {
     setPaymentMethod(method)
     setCryptoType('')
-    setCheckoutStep('payment')
   }
 
   const handlePaymentConfirmation = async () => {
@@ -221,36 +286,28 @@ export default function ShopClient() {
         paymentMethod,
         cryptoType: paymentMethod === 'crypto' ? cryptoType : null,
         cryptoWallet: paymentMethod === 'crypto' ? activeCryptoAddress : null,
-        paymentHandle:
-          paymentMethod === 'cashapp'
-            ? payConfig.cashapp?.handle
-            : paymentMethod === 'venmo'
-              ? payConfig.venmo?.handle
-              : paymentMethod === 'chipper'
-                ? payConfig.chipperCash?.handle
-                : null,
+        paymentHandle: paymentMethod !== 'crypto' ? activeHandle : null,
         timestamp: new Date().toISOString(),
       }
 
-     const response = await fetch('/api/checkout/create-order', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(orderData),
-})
+      const response = await fetch('/api/checkout/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData),
+      })
 
       if (response.ok) {
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+        await new Promise((resolve) => setTimeout(resolve, 1500))
         setCheckoutStep('confirmation')
         setCart([])
-        setPaymentConfirmed(true)
       } else {
-        throw new Error('Failed to submit order')
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to submit order')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Order submission error:', error)
-      setIsLoading(false)
       setCheckoutStep('payment')
-      alert('Failed to submit order. Please try again.')
+      alert(error.message || 'Failed to submit order. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -262,7 +319,6 @@ export default function ShopClient() {
     setCustomerDetails({ email: '', phone: '', address: '', altPhone: '' })
     setPaymentMethod('')
     setCryptoType('')
-    setPaymentConfirmed(false)
   }
 
   return (
@@ -276,6 +332,7 @@ export default function ShopClient() {
       <main className="pt-20 sm:pt-24 pb-20">
         <section className="relative mb-8 sm:mb-12">
           <div className="relative w-full h-48 sm:h-64 md:h-80">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={shopHeroImage} alt="Shop Collection" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
             <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6">
@@ -297,7 +354,7 @@ export default function ShopClient() {
               whileTap={{ scale: 0.95 }}
               onClick={openCheckout}
               disabled={cart.length === 0}
-              className="fixed bottom-6 right-4 sm:bottom-8 sm:right-6 z-40 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 sm:px-6 sm:py-4 rounded-full flex items-center gap-2 shadow-lg hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="fixed bottom-6 right-4 sm:bottom-8 sm:right-6 z-40 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 sm:px-6 sm:py-4 rounded-full flex items-center gap-2 shadow-lg disabled:opacity-50"
             >
               <ShoppingCart size={20} />
               <span className="hidden sm:inline font-bold">CART</span>
@@ -317,30 +374,32 @@ export default function ShopClient() {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.05 }}
                 viewport={{ once: true }}
-                className="bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:border-white/30 transition-all duration-300 group"
+                className="bg-white/5 border border-white/10 rounded-lg overflow-hidden hover:border-white/30 transition-all group"
               >
                 <div className="relative aspect-square overflow-hidden bg-black">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={product.image}
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                   <div
-                    className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-bold ${
+                    className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-bold text-white ${
                       product.stock > 20
                         ? 'bg-green-600'
                         : product.stock > 10
                           ? 'bg-yellow-600'
                           : 'bg-red-600'
-                    } text-white`}
+                    }`}
                   >
                     {product.stock} LEFT
                   </div>
                   <motion.button
                     whileHover={{ scale: 1.2 }}
                     whileTap={{ scale: 0.9 }}
+                    type="button"
                     onClick={() => toggleWishlist(product.id)}
-                    className="absolute top-2 left-2 bg-white/80 hover:bg-white p-2 rounded-full transition-colors"
+                    className="absolute top-2 left-2 bg-white/80 hover:bg-white p-2 rounded-full"
                   >
                     <Heart
                       size={18}
@@ -353,17 +412,14 @@ export default function ShopClient() {
 
                 <div className="p-3 sm:p-4 space-y-2 sm:space-y-3">
                   <div>
-                    <h3 className="text-white font-bold text-sm sm:text-base line-clamp-2 group-hover:text-blue-400 transition-colors">
+                    <h3 className="text-white font-bold text-sm sm:text-base line-clamp-2 group-hover:text-blue-400">
                       {product.name}
                     </h3>
                     <p className="text-gray-400 text-xs line-clamp-1">{product.description}</p>
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-400 font-bold text-lg sm:text-xl">
-                      ${Number(product.price).toFixed(2)}
-                    </span>
-                  </div>
+                  <span className="text-blue-400 font-bold text-lg sm:text-xl">
+                    ${Number(product.price).toFixed(2)}
+                  </span>
 
                   <div className="flex items-center gap-1 bg-white/5 rounded p-1">
                     <button
@@ -394,7 +450,10 @@ export default function ShopClient() {
                       onClick={() =>
                         setSelectedQuantity({
                           ...selectedQuantity,
-                          [product.id]: Math.min(product.stock, (selectedQuantity[product.id] || 1) + 1),
+                          [product.id]: Math.min(
+                            product.stock,
+                            (selectedQuantity[product.id] || 1) + 1
+                          ),
                         })
                       }
                       className="text-white/60 hover:text-white px-2 py-1 text-sm"
@@ -406,12 +465,13 @@ export default function ShopClient() {
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
+                    type="button"
                     onClick={() => addToCart(product)}
                     disabled={product.stock === 0}
                     className={`w-full py-2 sm:py-3 font-bold text-sm sm:text-base rounded transition-all ${
                       product.stock === 0
                         ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
+                        : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white'
                     }`}
                   >
                     {product.stock === 0 ? 'OUT OF STOCK' : 'ADD TO CART'}
@@ -423,23 +483,20 @@ export default function ShopClient() {
         </section>
       </main>
 
-      {/* Checkout Modal */}
       {checkoutOpen && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-4"
           onClick={() => !isLoading && resetCheckout()}
         >
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
-            exit={{ y: '100%' }}
             className="bg-gradient-to-b from-gray-900 to-black w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 p-4 sm:p-6 flex justify-between items-center">
+            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 p-4 sm:p-6 flex justify-between items-center z-10">
               <h2 className="text-white font-bold text-lg sm:text-2xl tracking-widest">
                 {checkoutStep === 'loader'
                   ? 'PROCESSING'
@@ -448,18 +505,13 @@ export default function ShopClient() {
                     : 'CHECKOUT'}
               </h2>
               {checkoutStep !== 'loader' && (
-                <motion.button
-                  whileHover={{ rotate: 90 }}
-                  onClick={resetCheckout}
-                  className="text-white hover:bg-white/20 p-2 rounded-full"
-                >
+                <button type="button" onClick={resetCheckout} className="text-white hover:bg-white/20 p-2 rounded-full">
                   <X size={24} />
-                </motion.button>
+                </button>
               )}
             </div>
 
             <div className="p-4 sm:p-6 space-y-6">
-              {/* CART */}
               {checkoutStep === 'cart' && (
                 <>
                   {cart.length === 0 ? (
@@ -475,6 +527,7 @@ export default function ShopClient() {
                             key={item.id}
                             className="bg-white/5 border border-white/10 rounded-lg p-3 sm:p-4 flex gap-3 sm:gap-4"
                           >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={item.image}
                               alt={item.name}
@@ -484,156 +537,103 @@ export default function ShopClient() {
                               <h3 className="text-white font-bold text-sm sm:text-base line-clamp-2">
                                 {item.name}
                               </h3>
-                              <p className="text-blue-400 font-bold text-sm sm:text-base">
-                                ${item.price.toFixed(2)}
-                              </p>
+                              <p className="text-blue-400 font-bold text-sm">${item.price.toFixed(2)}</p>
                               <div className="flex items-center gap-2 mt-2">
-                                <button
-                                  type="button"
-                                  onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                  className="text-white/60 hover:text-white px-1 py-0.5"
-                                >
+                                <button type="button" onClick={() => updateQuantity(item.id, item.quantity - 1)} className="text-white/60 hover:text-white px-1">
                                   −
                                 </button>
                                 <span className="text-white font-bold text-sm min-w-[30px] text-center">
                                   {item.quantity}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                  className="text-white/60 hover:text-white px-1 py-0.5"
-                                >
+                                <button type="button" onClick={() => updateQuantity(item.id, item.quantity + 1)} className="text-white/60 hover:text-white px-1">
                                   +
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => removeFromCart(item.id)}
-                                  className="ml-auto text-red-500 hover:text-red-400 text-sm"
-                                >
+                                <button type="button" onClick={() => removeFromCart(item.id)} className="ml-auto text-red-500 text-sm">
                                   Remove
                                 </button>
                               </div>
                             </div>
-                            <div className="text-right">
-                              <p className="text-white font-bold text-sm sm:text-base">
-                                ${(item.price * item.quantity).toFixed(2)}
-                              </p>
-                            </div>
+                            <p className="text-white font-bold text-sm">
+                              ${(item.price * item.quantity).toFixed(2)}
+                            </p>
                           </div>
                         ))}
                       </div>
-
                       <div className="border-t border-white/10 pt-4">
                         <div className="flex justify-between items-center mb-6">
-                          <span className="text-white text-lg sm:text-xl font-bold">TOTAL:</span>
-                          <span className="text-blue-400 text-2xl sm:text-3xl font-bold">
-                            ${totalPrice.toFixed(2)}
-                          </span>
+                          <span className="text-white text-lg font-bold">TOTAL:</span>
+                          <span className="text-blue-400 text-2xl font-bold">${totalPrice.toFixed(2)}</span>
                         </div>
-
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                        <button
+                          type="button"
                           onClick={() => setCheckoutStep('customer')}
-                          className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-3 sm:py-4 rounded-lg hover:from-green-700 hover:to-green-800 transition-all text-sm sm:text-base"
+                          className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-3 sm:py-4 rounded-lg"
                         >
                           CONTINUE TO CHECKOUT
-                        </motion.button>
+                        </button>
                       </div>
                     </>
                   )}
                 </>
               )}
 
-              {/* CUSTOMER DETAILS */}
               {checkoutStep === 'customer' && (
                 <>
                   <div className="bg-blue-600/20 border border-blue-600/50 rounded-lg p-4">
                     <p className="text-blue-400 text-sm font-bold">STEP 1 OF 3: ENTER YOUR DETAILS</p>
                   </div>
-
                   <form onSubmit={handleCustomerDetailsSubmit} className="space-y-4">
                     <div>
                       <label className="text-white text-sm font-bold block mb-2">EMAIL *</label>
                       <input
                         type="email"
                         value={customerDetails.email}
-                        onChange={(e) =>
-                          setCustomerDetails({ ...customerDetails, email: e.target.value })
-                        }
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                        placeholder="your@email.com"
+                        onChange={(e) => setCustomerDetails({ ...customerDetails, email: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                         required
                       />
                     </div>
-
                     <div>
-                      <label className="text-white text-sm font-bold block mb-2">PHONE NUMBER *</label>
+                      <label className="text-white text-sm font-bold block mb-2">PHONE *</label>
                       <input
                         type="tel"
                         value={customerDetails.phone}
-                        onChange={(e) =>
-                          setCustomerDetails({ ...customerDetails, phone: e.target.value })
-                        }
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                        placeholder="+1 (555) 123-4567"
+                        onChange={(e) => setCustomerDetails({ ...customerDetails, phone: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                         required
                       />
                     </div>
-
                     <div>
                       <label className="text-white text-sm font-bold block mb-2">ADDRESS *</label>
                       <input
                         type="text"
                         value={customerDetails.address}
-                        onChange={(e) =>
-                          setCustomerDetails({ ...customerDetails, address: e.target.value })
-                        }
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                        placeholder="123 Main St, City, State ZIP"
+                        onChange={(e) => setCustomerDetails({ ...customerDetails, address: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                         required
                       />
                     </div>
-
                     <div>
-                      <label className="text-white text-sm font-bold block mb-2">
-                        ALTERNATIVE PHONE (Optional)
-                      </label>
+                      <label className="text-white text-sm font-bold block mb-2">ALT PHONE (Optional)</label>
                       <input
                         type="tel"
                         value={customerDetails.altPhone}
-                        onChange={(e) =>
-                          setCustomerDetails({ ...customerDetails, altPhone: e.target.value })
-                        }
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
-                        placeholder="Backup phone number"
+                        onChange={(e) => setCustomerDetails({ ...customerDetails, altPhone: e.target.value })}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
                       />
                     </div>
-
                     <div className="flex gap-3">
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        type="button"
-                        onClick={() => setCheckoutStep('cart')}
-                        className="flex-1 bg-white/10 text-white font-bold py-3 rounded-lg hover:bg-white/20 transition-all"
-                      >
+                      <button type="button" onClick={() => setCheckoutStep('cart')} className="flex-1 bg-white/10 text-white font-bold py-3 rounded-lg">
                         BACK
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        type="submit"
-                        className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-3 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all"
-                      >
+                      </button>
+                      <button type="submit" className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-3 rounded-lg">
                         CONTINUE TO PAYMENT
-                      </motion.button>
+                      </button>
                     </div>
                   </form>
                 </>
               )}
 
-              {/* PAYMENT */}
               {checkoutStep === 'payment' && (
                 <>
                   <div className="bg-purple-600/20 border border-purple-600/50 rounded-lg p-4">
@@ -641,78 +641,59 @@ export default function ShopClient() {
                   </div>
 
                   {!payConfigLoaded ? (
-                    <div className="flex items-center justify-center py-10">
+                    <div className="flex justify-center py-10">
                       <Loader2 size={28} className="text-blue-400 animate-spin" />
                     </div>
                   ) : !paymentMethod ? (
                     <div className="space-y-3">
                       {hasCrypto && (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                        <button
                           type="button"
                           onClick={() => handlePaymentMethodSelect('crypto')}
-                          className="w-full bg-gradient-to-r from-yellow-600 to-yellow-700 text-white font-bold py-4 rounded-lg hover:from-yellow-700 hover:to-yellow-800 transition-all text-left px-6"
+                          className="w-full bg-gradient-to-r from-yellow-600 to-yellow-700 text-white font-bold py-4 rounded-lg text-left px-6"
                         >
                           <div className="font-bold text-lg">CRYPTO (BTC / USDT)</div>
                           <div className="text-sm text-yellow-100">Secure blockchain payment</div>
-                        </motion.button>
+                        </button>
                       )}
-
                       {hasCashapp && (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                        <button
                           type="button"
                           onClick={() => handlePaymentMethodSelect('cashapp')}
-                          className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 rounded-lg hover:from-green-700 hover:to-green-800 transition-all text-left px-6"
+                          className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 rounded-lg text-left px-6"
                         >
                           <div className="font-bold text-lg">CASH APP</div>
                           <div className="text-sm text-green-100">{payConfig.cashapp?.handle}</div>
-                        </motion.button>
+                        </button>
                       )}
-
                       {hasVenmo && (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                        <button
                           type="button"
                           onClick={() => handlePaymentMethodSelect('venmo')}
-                          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-4 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all text-left px-6"
+                          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-4 rounded-lg text-left px-6"
                         >
                           <div className="font-bold text-lg">VENMO</div>
                           <div className="text-sm text-blue-100">{payConfig.venmo?.handle}</div>
-                        </motion.button>
+                        </button>
                       )}
-
                       {hasChipper && (
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
+                        <button
                           type="button"
                           onClick={() => handlePaymentMethodSelect('chipper')}
-                          className="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white font-bold py-4 rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all text-left px-6"
+                          className="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white font-bold py-4 rounded-lg text-left px-6"
                         >
                           <div className="font-bold text-lg">CHIPPER CASH</div>
                           <div className="text-sm text-purple-100">{payConfig.chipperCash?.handle}</div>
-                        </motion.button>
+                        </button>
                       )}
-
                       {!hasAnyPayment && (
                         <p className="text-gray-400 text-sm text-center py-8">
-                          No payment methods configured yet. Please check back soon.
+                          No payment methods configured yet.
                         </p>
                       )}
-
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        type="button"
-                        onClick={() => setCheckoutStep('customer')}
-                        className="w-full bg-white/10 text-white font-bold py-3 rounded-lg hover:bg-white/20 transition-all"
-                      >
+                      <button type="button" onClick={() => setCheckoutStep('customer')} className="w-full bg-white/10 text-white font-bold py-3 rounded-lg">
                         BACK
-                      </motion.button>
+                      </button>
                     </div>
                   ) : (
                     <>
@@ -720,88 +701,75 @@ export default function ShopClient() {
                         <div className="space-y-3">
                           <p className="text-white font-bold text-sm">SELECT CRYPTO TYPE:</p>
                           {hasBtc && (
-                            <motion.button
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              type="button"
-                              onClick={() => setCryptoType('btc')}
-                              className="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition-all"
-                            >
+                            <button type="button" onClick={() => setCryptoType('btc')} className="w-full bg-orange-600 text-white font-bold py-3 rounded-lg">
                               BITCOIN (BTC)
-                            </motion.button>
+                            </button>
                           )}
                           {hasUsdt && (
-                            <motion.button
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              type="button"
-                              onClick={() => setCryptoType('usdt')}
-                              className="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition-all"
-                            >
+                            <button type="button" onClick={() => setCryptoType('usdt')} className="w-full bg-green-600 text-white font-bold py-3 rounded-lg">
                               USDT (TETHER)
-                            </motion.button>
+                            </button>
                           )}
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                          <button
                             type="button"
                             onClick={() => {
                               setPaymentMethod('')
                               setCryptoType('')
                             }}
-                            className="w-full bg-white/10 text-white font-bold py-3 rounded-lg hover:bg-white/20 transition-all"
+                            className="w-full bg-white/10 text-white font-bold py-3 rounded-lg"
                           >
                             CHANGE PAYMENT METHOD
-                          </motion.button>
+                          </button>
                         </div>
                       )}
 
                       {(paymentMethod !== 'crypto' || cryptoType) && (
                         <>
                           <div className="bg-white/5 border border-white/10 rounded-lg p-6 space-y-4">
-                            <div>
-                              <p className="text-gray-400 text-sm mb-3">SEND PAYMENT TO:</p>
+                            <p className="text-gray-400 text-sm mb-1">SEND PAYMENT TO:</p>
 
-                              {paymentMethod === 'crypto' ? (
-                                <>
-                                  <p className="text-white text-xs mb-2">
-                                    Wallet Address ({cryptoType?.toUpperCase()}):
+                            {paymentMethod === 'crypto' ? (
+                              <>
+                                <p className="text-white text-xs mb-2">
+                                  Wallet Address ({cryptoType?.toUpperCase()}):
+                                </p>
+                                <div className="bg-black/40 rounded px-4 py-3 break-all">
+                                  <p
+                                    className="text-green-400 font-bold text-sm font-mono select-all"
+                                    style={{ userSelect: 'all' }}
+                                  >
+                                    {activeCryptoAddress || 'Address not available'}
                                   </p>
-                                  <div className="bg-black/40 rounded px-4 py-3 break-all">
-                                    <p className="text-green-400 font-bold text-sm font-mono">
-                                      {activeCryptoAddress || 'Address not available'}
-                                    </p>
-                                  </div>
-                                </>
-                              ) : paymentMethod === 'cashapp' ? (
-                                <>
-                                  <p className="text-white text-xs mb-2">Cash App Handle:</p>
-                                  <div className="bg-black/40 rounded px-4 py-3">
-                                    <p className="text-green-400 font-bold text-lg">
-                                      {payConfig.cashapp?.handle}
-                                    </p>
-                                  </div>
-                                </>
-                              ) : paymentMethod === 'venmo' ? (
-                                <>
-                                  <p className="text-white text-xs mb-2">Venmo Handle:</p>
-                                  <div className="bg-black/40 rounded px-4 py-3">
-                                    <p className="text-blue-400 font-bold text-lg">
-                                      {payConfig.venmo?.handle}
-                                    </p>
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <p className="text-white text-xs mb-2">Chipper Cash Handle:</p>
-                                  <div className="bg-black/40 rounded px-4 py-3">
-                                    <p className="text-purple-400 font-bold text-lg">
-                                      {payConfig.chipperCash?.handle}
-                                    </p>
-                                  </div>
-                                </>
-                              )}
-                            </div>
+                                </div>
+                                {activeCryptoAddress && <CopyButton value={activeCryptoAddress} />}
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-white text-xs mb-2">
+                                  {paymentMethod === 'cashapp'
+                                    ? 'Cash App Handle'
+                                    : paymentMethod === 'venmo'
+                                      ? 'Venmo Handle'
+                                      : 'Chipper Cash Handle'}
+                                  :
+                                </p>
+                                <div className="bg-black/40 rounded px-4 py-3">
+                                  <p
+                                    className={`font-bold text-lg select-all ${
+                                      paymentMethod === 'cashapp'
+                                        ? 'text-green-400'
+                                        : paymentMethod === 'venmo'
+                                          ? 'text-blue-400'
+                                          : 'text-purple-400'
+                                    }`}
+                                    style={{ userSelect: 'all' }}
+                                  >
+                                    {activeHandle}
+                                  </p>
+                                </div>
+                                {activeHandle && <CopyButton value={activeHandle} />}
+                              </>
+                            )}
 
                             <div className="border-t border-white/10 pt-4">
                               <p className="text-white font-bold text-lg mb-2">ORDER TOTAL</p>
@@ -812,33 +780,27 @@ export default function ShopClient() {
                           <div className="bg-yellow-600/20 border border-yellow-600/50 rounded-lg p-4">
                             <p className="text-yellow-400 text-xs font-bold mb-2">PAYMENT INSTRUCTIONS</p>
                             <p className="text-yellow-300 text-xs">
-                              Include your email ({customerDetails.email}) in the payment note for order
-                              confirmation.
+                              Include your email ({customerDetails.email}) in the payment note.
                             </p>
                           </div>
 
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                          <button
                             type="button"
                             onClick={handlePaymentConfirmation}
-                            className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 rounded-lg hover:from-green-700 hover:to-green-800 transition-all text-lg"
+                            className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 rounded-lg text-lg"
                           >
                             I HAVE PAID ✓
-                          </motion.button>
-
-                          <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
+                          </button>
+                          <button
                             type="button"
                             onClick={() => {
                               setPaymentMethod('')
                               setCryptoType('')
                             }}
-                            className="w-full bg-white/10 text-white font-bold py-3 rounded-lg hover:bg-white/20 transition-all"
+                            className="w-full bg-white/10 text-white font-bold py-3 rounded-lg"
                           >
                             CHANGE PAYMENT METHOD
-                          </motion.button>
+                          </button>
                         </>
                       )}
                     </>
@@ -846,66 +808,36 @@ export default function ShopClient() {
                 </>
               )}
 
-              {/* CONFIRMATION */}
               {checkoutStep === 'confirmation' && (
                 <>
                   <div className="text-center space-y-4 py-8">
-                    <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto">
-                      <div className="text-white text-3xl font-bold">✓</div>
+                    <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto text-white text-3xl font-bold">
+                      ✓
                     </div>
                     <h3 className="text-white text-2xl font-bold">ORDER RECEIVED!</h3>
-                    <p className="text-gray-400">Thank you for your purchase!</p>
+                    <p className="text-gray-400">Thank you for your purchase.</p>
                   </div>
-
-                  <div className="bg-green-600/20 border border-green-600/50 rounded-lg p-4 space-y-3">
-                    <div>
-                      <p className="text-green-400 text-xs font-bold mb-1">ORDER CONFIRMATION</p>
-                      <p className="text-white">Email confirmation will be sent to:</p>
-                      <p className="text-blue-400 font-bold break-all">{customerDetails.email}</p>
-                    </div>
-                    <div className="border-t border-green-600/30 pt-3">
-                      <p className="text-green-400 text-xs font-bold mb-1">NEXT STEPS</p>
-                      <p className="text-gray-300 text-sm">1. Check your email for order details</p>
-                      <p className="text-gray-300 text-sm">2. Admin will verify your payment</p>
-                      <p className="text-gray-300 text-sm">3. Your order will be processed & shipped</p>
-                    </div>
+                  <div className="bg-green-600/20 border border-green-600/50 rounded-lg p-4 space-y-2">
+                    <p className="text-green-400 text-xs font-bold">CONFIRMATION</p>
+                    <p className="text-white text-sm">
+                      We&apos;ll email <span className="text-blue-400 font-bold break-all">{customerDetails.email}</span> after payment is verified.
+                    </p>
                   </div>
-
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                  <button
                     type="button"
                     onClick={resetCheckout}
-                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-4 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all"
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-4 rounded-lg"
                   >
                     CONTINUE SHOPPING
-                  </motion.button>
+                  </button>
                 </>
               )}
 
-              {/* LOADER */}
               {checkoutStep === 'loader' && (
                 <div className="text-center py-12 space-y-6">
                   <Loader2 size={56} className="text-blue-500 animate-spin mx-auto" />
-                  <div>
-                    <h3 className="text-white text-xl font-bold mb-2">PROCESSING YOUR ORDER</h3>
-                    <p className="text-gray-400">Please wait while we confirm your order...</p>
-                  </div>
-                  <div className="bg-white/5 border border-white/10 rounded-lg p-4 text-left space-y-2">
-                    <p className="text-gray-400 text-sm">Order Details:</p>
-                    <p className="text-white text-sm">
-                      <span className="text-gray-500">Items:</span> {cart.length} product(s)
-                    </p>
-                    <p className="text-white text-sm">
-                      <span className="text-gray-500">Total:</span> ${totalPrice.toFixed(2)}
-                    </p>
-                    <p className="text-white text-sm">
-                      <span className="text-gray-500">Method:</span>{' '}
-                      {paymentMethod === 'crypto'
-                        ? cryptoType?.toUpperCase()
-                        : paymentMethod?.toUpperCase()}
-                    </p>
-                  </div>
+                  <h3 className="text-white text-xl font-bold">PROCESSING YOUR ORDER</h3>
+                  <p className="text-gray-400 text-sm">Please wait...</p>
                 </div>
               )}
             </div>
