@@ -12,8 +12,6 @@ import Footer from '@/components/layout/Footer'
 import { useUserAuth } from '@/components/user/UserAuthProvider'
 import { useFirestoreListener } from '@/hooks/useFirestoreListener'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type PayMethod = 'USDT' | 'BTC' | 'Venmo' | 'ChipperCash' | 'CashApp'
 type FanTierId = 'regular' | 'gold' | 'diamond'
 type PageState = 'loading' | 'apply' | 'submitted' | 'awaiting' | 'whitelisted'
@@ -58,12 +56,7 @@ interface FanCardSettingsData {
   }
 }
 
-// ─── Tier styles ──────────────────────────────────────────────────────────────
-
-const TIER_STYLE: Record<
-  FanTierId,
-  { background: string; accent: string; badge: string }
-> = {
+const TIER_STYLE: Record<FanTierId, { background: string; accent: string; badge: string }> = {
   regular: {
     background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)',
     accent: '#FF0000',
@@ -92,8 +85,6 @@ const DEFAULT_TIER_PRICES: Record<FanTierId, number> = {
   diamond: 50000,
 }
 
-// ─── Name font (prevents cutoff) ──────────────────────────────────────────────
-
 function nameFontSize(name: string): number {
   const len = name.length || 8
   if (len > 24) return 11
@@ -101,8 +92,6 @@ function nameFontSize(name: string): number {
   if (len > 12) return 16
   return 20
 }
-
-// ─── 3D Fan Card ──────────────────────────────────────────────────────────────
 
 function FanCard3D({
   name,
@@ -162,13 +151,13 @@ function FanCard3D({
         mouseY.set(0)
       }}
       onContextMenu={(e) => e.preventDefault()}
-      className="flex items-center justify-center p-8 select-none"
+      className="flex items-center justify-center p-4 sm:p-8 select-none"
       style={{ perspective: '1000px', WebkitUserSelect: 'none', userSelect: 'none' }}
     >
       <motion.div
         style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }}
         animate={vibrating ? { x: [-3, 3, -3, 3, 0], transition: { duration: 0.25 } } : {}}
-        className="relative w-[340px] h-[210px] cursor-pointer"
+        className="relative w-[min(100%,340px)] h-[210px] cursor-pointer"
       >
         <div
           ref={cardRef}
@@ -186,14 +175,10 @@ function FanCard3D({
               background: `radial-gradient(circle at ${glareX.get()} ${glareY.get()}, rgba(255,255,255,0.4) 0%, transparent 60%)`,
             }}
           />
-
           <div
             className="absolute top-0 left-0 right-0 h-1"
-            style={{
-              background: `linear-gradient(to right, ${accentColor}, #ffffff88, ${accentColor})`,
-            }}
+            style={{ background: `linear-gradient(to right, ${accentColor}, #ffffff88, ${accentColor})` }}
           />
-
           <div className="absolute top-5 left-5 w-10 h-7 rounded bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center">
             <div className="grid grid-cols-2 gap-0.5 opacity-60">
               {[...Array(4)].map((_, i) => (
@@ -201,24 +186,17 @@ function FanCard3D({
               ))}
             </div>
           </div>
-
           <div
             className="absolute top-4 right-4 w-12 h-12 rounded-full overflow-hidden border-2"
             style={{ borderColor: `${accentColor}99` }}
           >
             <Image src={logoUrl} alt="Jonathan Roumie" fill className="object-cover" unoptimized />
           </div>
-
           <div className="absolute top-[52px] left-5 right-16">
             <p className="text-white/50 text-[9px] tracking-[0.3em] uppercase">{badge}</p>
             <p className="text-white text-xs font-bold tracking-[0.25em]">JONATHAN ROUMIE</p>
           </div>
-
-          {/* Name band — reserved height to avoid cutoff */}
-          <div
-            className="absolute left-5 right-5 flex items-end"
-            style={{ bottom: 36, height: 36 }}
-          >
+          <div className="absolute left-5 right-5 flex items-end" style={{ bottom: 36, height: 36 }}>
             <p
               className="text-white font-bold tracking-[0.12em] uppercase w-full"
               style={{
@@ -234,29 +212,22 @@ function FanCard3D({
               {display}
             </p>
           </div>
-
           <div className="absolute bottom-3 left-5 right-5 flex justify-between items-center">
             <p className="text-white/40 text-[10px] tracking-widest font-mono">{memberId}</p>
             <p className="text-white/40 text-[10px] tracking-widest">{year}</p>
           </div>
-
           {footerText && (
             <p className="absolute bottom-[1px] left-0 right-0 text-center text-[7px] tracking-widest text-white/15 px-2 truncate">
               {footerText}
             </p>
           )}
-
           <svg className="absolute inset-0 w-full h-full opacity-5 pointer-events-none" viewBox="0 0 340 210">
             <line x1="0" y1="100" x2="340" y2="100" stroke="white" strokeWidth="0.5" />
             <line x1="170" y1="0" x2="170" y2="210" stroke="white" strokeWidth="0.5" />
             <circle cx="170" cy="100" r="40" stroke="white" strokeWidth="0.5" fill="none" />
           </svg>
-
           {showUnverifiedWatermark && (
-            <div
-              className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden"
-              aria-hidden
-            >
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden" aria-hidden>
               <div
                 className="absolute inset-0 opacity-[0.12]"
                 style={{
@@ -266,54 +237,56 @@ function FanCard3D({
               />
               <span
                 className="text-white/25 font-black tracking-[0.35em] uppercase select-none"
-                style={{
-                  fontSize: 28,
-                  transform: 'rotate(-28deg)',
-                  whiteSpace: 'nowrap',
-                  textShadow: '0 0 1px rgba(0,0,0,0.5)',
-                }}
+                style={{ fontSize: 28, transform: 'rotate(-28deg)', whiteSpace: 'nowrap' }}
               >
                 UNVERIFIED
               </span>
               <span
                 className="absolute text-white/15 font-black tracking-[0.3em] uppercase select-none"
-                style={{
-                  fontSize: 18,
-                  transform: 'rotate(-28deg) translateY(42px)',
-                  whiteSpace: 'nowrap',
-                }}
+                style={{ fontSize: 18, transform: 'rotate(-28deg) translateY(42px)', whiteSpace: 'nowrap' }}
               >
                 NOT FOR OFFICIAL USE
               </span>
             </div>
           )}
         </div>
-
         <div
           className="absolute inset-0 rounded-2xl pointer-events-none"
-          style={{
-            transform: 'translateZ(-4px)',
-            background: '#0a0a1a',
-            boxShadow: '0 30px 60px rgba(0,0,0,0.6)',
-          }}
+          style={{ transform: 'translateZ(-4px)', background: '#0a0a1a', boxShadow: '0 30px 60px rgba(0,0,0,0.6)' }}
         />
       </motion.div>
     </div>
   )
 }
 
-// ─── Copy Button ───────────────────────────────────────────────────────────────
-
 function CopyButton({ address }: { address: string }) {
   const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(address)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = address
+        ta.style.position = 'fixed'
+        ta.style.left = '-9999px'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch {
+      alert('Copy failed — long-press the address and copy manually.')
+    }
+  }
+
   return (
     <button
       type="button"
-      onClick={() => {
-        navigator.clipboard.writeText(address)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2500)
-      }}
+      onClick={copy}
       className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
         copied
           ? 'bg-green-900/40 border border-green-600/50 text-green-300'
@@ -323,19 +296,17 @@ function CopyButton({ address }: { address: string }) {
       <AnimatePresence mode="wait">
         {copied ? (
           <motion.span key="y" initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex items-center gap-1.5">
-            <Check size={14} />Copied!
+            <Check size={14} /> Copied!
           </motion.span>
         ) : (
           <motion.span key="n" initial={{ scale: 0 }} animate={{ scale: 1 }} className="flex items-center gap-1.5">
-            <Copy size={14} />Copy
+            <Copy size={14} /> Copy
           </motion.span>
         )}
       </AnimatePresence>
     </button>
   )
 }
-
-// ─── Payment destination ───────────────────────────────────────────────────────
 
 function PaymentDestination({
   method,
@@ -353,21 +324,18 @@ function PaymentDestination({
     if (!address) return null
     const isBtc = method === 'BTC'
     const border = isBtc ? 'border-orange-800/30 bg-orange-950/20' : 'border-green-800/30 bg-green-950/20'
-
     return (
       <div className={`rounded-xl border p-5 space-y-4 ${border}`}>
         <div className="flex items-center gap-2">
-          {isBtc ? (
-            <Bitcoin size={16} className="text-orange-400" />
-          ) : (
-            <span className="text-green-400 font-black text-sm">₮</span>
-          )}
+          {isBtc ? <Bitcoin size={16} className="text-orange-400" /> : <span className="text-green-400 font-black text-sm">₮</span>}
           <p className="text-xs tracking-widest uppercase text-white/50 font-semibold">
             {isBtc ? 'Bitcoin (BTC) Address' : 'USDT — ERC-20 Ethereum'}
           </p>
         </div>
         <div className="bg-black/50 border border-white/10 rounded-lg px-4 py-3">
-          <p className="font-mono text-sm text-white break-all select-all">{address}</p>
+          <p className="font-mono text-sm text-white break-all select-all" style={{ userSelect: 'all' }}>
+            {address}
+          </p>
         </div>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <CopyButton address={address} />
@@ -399,7 +367,9 @@ function PaymentDestination({
     <div className="rounded-xl border border-white/10 bg-white/5 p-5 space-y-4">
       <p className="text-xs tracking-widest uppercase text-white/50 font-semibold">{label}</p>
       <div className="bg-black/50 border border-white/10 rounded-lg px-4 py-3">
-        <p className={`font-bold text-lg break-all select-all ${accent}`}>{handle}</p>
+        <p className={`font-bold text-lg break-all select-all ${accent}`} style={{ userSelect: 'all' }}>
+          {handle}
+        </p>
       </div>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <CopyButton address={handle} />
@@ -414,39 +384,25 @@ function PaymentDestination({
 
 function methodLabel(m: PayMethod) {
   switch (m) {
-    case 'BTC':
-      return '₿ BITCOIN'
-    case 'USDT':
-      return '₮ USDT'
-    case 'Venmo':
-      return 'VENMO'
-    case 'CashApp':
-      return 'CASH APP'
-    case 'ChipperCash':
-      return 'CHIPPER'
-    default:
-      return m
+    case 'BTC': return '₿ BITCOIN'
+    case 'USDT': return '₮ USDT'
+    case 'Venmo': return 'VENMO'
+    case 'CashApp': return 'CASH APP'
+    case 'ChipperCash': return 'CHIPPER'
+    default: return m
   }
 }
 
 function methodActiveClass(m: PayMethod) {
   switch (m) {
-    case 'BTC':
-      return 'bg-orange-900/40 border border-orange-600/60 text-orange-300'
-    case 'USDT':
-      return 'bg-green-900/40 border border-green-600/60 text-green-300'
-    case 'Venmo':
-      return 'bg-blue-900/40 border border-blue-600/60 text-blue-300'
-    case 'CashApp':
-      return 'bg-green-900/40 border border-green-600/60 text-green-300'
-    case 'ChipperCash':
-      return 'bg-purple-900/40 border border-purple-600/60 text-purple-300'
-    default:
-      return 'bg-white/10 border border-white/20 text-white'
+    case 'BTC': return 'bg-orange-900/40 border border-orange-600/60 text-orange-300'
+    case 'USDT': return 'bg-green-900/40 border border-green-600/60 text-green-300'
+    case 'Venmo': return 'bg-blue-900/40 border border-blue-600/60 text-blue-300'
+    case 'CashApp': return 'bg-green-900/40 border border-green-600/60 text-green-300'
+    case 'ChipperCash': return 'bg-purple-900/40 border border-purple-600/60 text-purple-300'
+    default: return 'bg-white/10 border border-white/20 text-white'
   }
 }
-
-// ─── Application Form ──────────────────────────────────────────────────────────
 
 function ApplicationForm({
   wallets,
@@ -488,9 +444,7 @@ function ApplicationForm({
 
   const waybillPrice = 23.0
   const priceUsd = (priceCents / 100).toFixed(2)
-  const totalPrice = addWaybill
-    ? (parseFloat(priceUsd) + waybillPrice).toFixed(2)
-    : priceUsd
+  const totalPrice = addWaybill ? (parseFloat(priceUsd) + waybillPrice).toFixed(2) : priceUsd
 
   const handleSubmit = async () => {
     setError(null)
@@ -556,22 +510,10 @@ function ApplicationForm({
       </div>
 
       <div className="bg-white/5 border border-white/10 rounded-xl p-4 space-y-3">
-        <button
-          type="button"
-          onClick={() => setAddWaybill(!addWaybill)}
-          className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/5 transition-colors"
-        >
-          <input
-            type="checkbox"
-            checked={addWaybill}
-            onChange={() => setAddWaybill(!addWaybill)}
-            className="w-5 h-5 cursor-pointer accent-jcvd-red"
-          />
+        <button type="button" onClick={() => setAddWaybill(!addWaybill)} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/5">
+          <input type="checkbox" checked={addWaybill} onChange={() => setAddWaybill(!addWaybill)} className="w-5 h-5 accent-jcvd-red" />
           <div className="flex-1 text-left">
-            <div className="flex items-center gap-2 text-white font-bold">
-              <Truck size={16} />
-              Add Waybill Shipping
-            </div>
+            <div className="flex items-center gap-2 text-white font-bold"><Truck size={16} /> Add Waybill Shipping</div>
             <p className="text-gray-400 text-xs">Physical delivery with tracking</p>
           </div>
           <span className="text-jcvd-red font-black">+${waybillPrice.toFixed(2)}</span>
@@ -579,8 +521,7 @@ function ApplicationForm({
         {addWaybill && (
           <div className="mt-2 pt-3 border-t border-white/10 space-y-2">
             <label className="flex items-center gap-2 text-gray-400 text-xs tracking-widest uppercase">
-              <MapPin size={12} />
-              Shipping Address
+              <MapPin size={12} /> Shipping Address
             </label>
             <textarea
               value={shippingAddress}
@@ -602,9 +543,7 @@ function ApplicationForm({
               type="button"
               onClick={() => setMethod(m)}
               className={`py-3 px-2 rounded-xl text-xs sm:text-sm font-bold tracking-widest transition-all ${
-                method === m
-                  ? methodActiveClass(m)
-                  : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/8'
+                method === m ? methodActiveClass(m) : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/8'
               }`}
             >
               {methodLabel(m)}
@@ -623,24 +562,22 @@ function ApplicationForm({
 
       <div>
         <label className="flex items-center gap-2 text-gray-400 text-xs tracking-widest uppercase mb-2">
-          <UserIcon size={12} />
-          Name to Engrave on Card
+          <UserIcon size={12} /> Name to Engrave on Card
         </label>
         <input
           type="text"
           value={name}
           onChange={(e) => onNameChange(e.target.value.slice(0, 28))}
           placeholder="Your Full Name"
-          className="w-full bg-white/5 border border-white/10 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-jcvd-red text-center tracking-widest text-lg"
           maxLength={28}
+          className="w-full bg-white/5 border border-white/10 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-jcvd-red text-center tracking-widest text-lg"
         />
         <p className="text-right text-white/20 text-xs mt-1">{name.length}/28</p>
       </div>
 
       <div>
         <label className="flex items-center gap-2 text-gray-400 text-xs tracking-widest uppercase mb-2">
-          <Mail size={12} />
-          Your Email Address
+          <Mail size={12} /> Your Email Address
         </label>
         <input
           type="email"
@@ -665,34 +602,19 @@ function ApplicationForm({
         className="w-full bg-jcvd-red hover:bg-red-700 text-white py-4 rounded-xl font-bold tracking-widest disabled:opacity-60 flex items-center justify-center gap-3"
       >
         {submitting ? (
-          <>
-            <Loader2 size={20} className="animate-spin" />
-            Submitting...
-          </>
+          <><Loader2 size={20} className="animate-spin" /> Submitting...</>
         ) : (
-          <>
-            <CheckCircle size={20} />
-            I HAVE SENT PAYMENT
-          </>
+          <><CheckCircle size={20} /> I HAVE SENT PAYMENT</>
         )}
       </button>
     </div>
   )
 }
 
-// ─── Main Page ─────────────────────────────────────────────────────────────────
-
 export default function FanCardPage() {
   const { user, loading: authLoading, whitelisted, login, logout, getToken } = useUserAuth()
-
-  const { data: firestoreWallets } = useFirestoreListener<CryptoWalletsData>(
-    'pageSettings',
-    'cryptoWallets'
-  )
-  const { data: fanCardSettings } = useFirestoreListener<FanCardSettingsData>(
-    'pageSettings',
-    'fanCard'
-  )
+  const { data: firestoreWallets } = useFirestoreListener<CryptoWalletsData>('pageSettings', 'cryptoWallets')
+  const { data: fanCardSettings } = useFirestoreListener<FanCardSettingsData>('pageSettings', 'fanCard')
 
   const [pageState, setPageState] = useState<PageState>('loading')
   const [submittedEmail, setSubmittedEmail] = useState('')
@@ -703,25 +625,18 @@ export default function FanCardPage() {
   const [loginLoading, setLoginLoading] = useState(false)
   const [exportClean, setExportClean] = useState(false)
   const [selectedTier, setSelectedTier] = useState<FanTierId>('regular')
-  /** Last paid / owned tier for upgrade suggestions */
   const [ownedTier, setOwnedTier] = useState<FanTierId | null>(null)
 
   const cardRef = useRef<HTMLDivElement>(null)
   const canDownload = pageState === 'whitelisted'
-
   const antiScreenshot = fanCardSettings?.antiScreenshot !== false
   const logoUrl = fanCardSettings?.logoUrl || '/images/jvcd-avatar.jpg'
-  const footerText =
-    fanCardSettings?.footerText || 'OFFICIAL JONATHAN ROUMIE WORLD FAN CARD'
+  const footerText = fanCardSettings?.footerText || 'OFFICIAL JONATHAN ROUMIE WORLD FAN CARD'
 
   const tiers: Record<FanTierId, { enabled: boolean; price: number; label: string }> = {
     regular: {
       enabled: fanCardSettings?.tiers?.regular?.enabled !== false,
-      price: Number(
-        fanCardSettings?.tiers?.regular?.price ??
-          fanCardSettings?.price ??
-          DEFAULT_TIER_PRICES.regular
-      ),
+      price: Number(fanCardSettings?.tiers?.regular?.price ?? fanCardSettings?.price ?? DEFAULT_TIER_PRICES.regular),
       label: fanCardSettings?.tiers?.regular?.label || 'Regular Fan',
     },
     gold: {
@@ -736,7 +651,6 @@ export default function FanCardPage() {
     },
   }
 
-  // Ensure selected tier is enabled
   useEffect(() => {
     if (!tiers[selectedTier].enabled) {
       const first = (['regular', 'gold', 'diamond'] as FanTierId[]).find((id) => tiers[id].enabled)
@@ -751,18 +665,12 @@ export default function FanCardPage() {
 
   const memberId = `JR-${Math.abs(
     cardName.split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0x12345)
-  )
-    .toString()
-    .slice(0, 6)
-    .padStart(6, '0')}`
+  ).toString().slice(0, 6).padStart(6, '0')}`
 
-  // Persist owned tier locally after verification
   useEffect(() => {
     if (typeof window === 'undefined') return
     const stored = localStorage.getItem('fanCardOwnedTier') as FanTierId | null
-    if (stored && ['regular', 'gold', 'diamond'].includes(stored)) {
-      setOwnedTier(stored)
-    }
+    if (stored && ['regular', 'gold', 'diamond'].includes(stored)) setOwnedTier(stored)
   }, [])
 
   useEffect(() => {
@@ -771,36 +679,25 @@ export default function FanCardPage() {
     }
   }, [pageState, ownedTier])
 
-  // Anti-screenshot
   useEffect(() => {
     if (!antiScreenshot) return
-
-    const blockContext = (e: Event) => e.preventDefault()
-    const blockSelect = (e: Event) => e.preventDefault()
-    const blockDrag = (e: Event) => e.preventDefault()
+    const block = (e: Event) => e.preventDefault()
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'PrintScreen') {
-        e.preventDefault()
-        navigator.clipboard?.writeText?.('').catch(() => {})
-      }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'p')) {
-        e.preventDefault()
-      }
+      if (e.key === 'PrintScreen') e.preventDefault()
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'p')) e.preventDefault()
     }
-
-    document.addEventListener('contextmenu', blockContext)
-    document.addEventListener('selectstart', blockSelect)
-    document.addEventListener('dragstart', blockDrag)
+    document.addEventListener('contextmenu', block)
+    document.addEventListener('selectstart', block)
+    document.addEventListener('dragstart', block)
     document.addEventListener('keydown', onKeyDown)
-    const prevUserSelect = document.body.style.userSelect
+    const prev = document.body.style.userSelect
     document.body.style.userSelect = 'none'
-
     return () => {
-      document.removeEventListener('contextmenu', blockContext)
-      document.removeEventListener('selectstart', blockSelect)
-      document.removeEventListener('dragstart', blockDrag)
+      document.removeEventListener('contextmenu', block)
+      document.removeEventListener('selectstart', block)
+      document.removeEventListener('dragstart', block)
       document.removeEventListener('keydown', onKeyDown)
-      document.body.style.userSelect = prevUserSelect
+      document.body.style.userSelect = prev
     }
   }, [antiScreenshot])
 
@@ -847,19 +744,15 @@ export default function FanCardPage() {
               setPageState('apply')
               return
             }
-            const res = await fetch('/api/user/status', {
-              headers: { Authorization: `Bearer ${token}` },
-            })
+            const res = await fetch('/api/user/status', { headers: { Authorization: `Bearer ${token}` } })
             if (!res.ok) {
               setPageState('apply')
               return
             }
             const data = await res.json()
-            if (data.paymentStatus === 'pending' || data.paymentStatus === 'confirmed') {
-              setPageState('awaiting')
-            } else {
-              setPageState('apply')
-            }
+            setPageState(
+              data.paymentStatus === 'pending' || data.paymentStatus === 'confirmed' ? 'awaiting' : 'apply'
+            )
           } catch {
             setPageState('apply')
           }
@@ -879,9 +772,7 @@ export default function FanCardPage() {
     setTimeout(async () => {
       try {
         await login()
-      } catch {
-        /* manual sign-in ok */
-      }
+      } catch { /* ok */ }
     }, 2200)
   }
 
@@ -900,21 +791,16 @@ export default function FanCardPage() {
       return
     }
     if (pageState !== 'whitelisted') {
-      alert(
-        'Downloads are only available after payment is verified by admin. Your preview stays watermarked until then.'
-      )
+      alert('Downloads only after payment is verified by admin.')
       return
     }
     if (!cardRef.current) return
-
     setExporting(true)
     setExportClean(true)
     await new Promise((r) => setTimeout(r, 120))
-
     try {
       const { default: html2canvas } = await import('html2canvas')
       const { jsPDF } = await import('jspdf')
-
       const node = cardRef.current
       const canvas = await html2canvas(node, {
         scale: 4,
@@ -927,17 +813,10 @@ export default function FanCardPage() {
         windowWidth: node.offsetWidth,
         windowHeight: node.offsetHeight,
       })
-
       const imgData = canvas.toDataURL('image/png')
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: [85.6, 53.98],
-      })
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [85.6, 53.98] })
       pdf.addImage(imgData, 'PNG', 0, 0, 85.6, 53.98)
-      pdf.save(
-        `JonathanRoumie-${selectedTier}-Fan-Card-${cardName.replace(/\s+/g, '-')}.pdf`
-      )
+      pdf.save(`JonathanRoumie-${selectedTier}-Fan-Card-${cardName.replace(/\s+/g, '-')}.pdf`)
     } catch (err) {
       console.error(err)
       alert('Export failed. Please try again.')
@@ -964,36 +843,21 @@ export default function FanCardPage() {
   }
 
   return (
-    <div
-      className="min-h-screen bg-black"
-      style={antiScreenshot ? { WebkitUserSelect: 'none', userSelect: 'none' } : undefined}
-    >
+    <div className="min-h-screen bg-black" style={antiScreenshot ? { WebkitUserSelect: 'none', userSelect: 'none' } : undefined}>
       <Header variant="main" />
-
       <main className="pt-20 pb-16">
-        <section className="text-center px-4 py-12">
+        <section className="text-center px-4 py-10 sm:py-12">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-widest text-white mb-3">
-              JONATHAN ROUMIE
-            </h1>
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-widest text-white mb-3">JONATHAN ROUMIE</h1>
             <p className="text-gray-400 mb-1 text-sm tracking-widest uppercase">Official</p>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-jcvd-red tracking-widest mb-6">
-              FAN CARD
-            </h2>
-            <p className="text-gray-400 max-w-2xl mx-auto text-base leading-relaxed">
-              Choose Regular, Gold, or Diamond membership. Each tier has its own card design and price set by
-              admin.
+            <h2 className="text-xl sm:text-3xl font-black text-jcvd-red tracking-widest mb-6">FAN CARD</h2>
+            <p className="text-gray-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed px-2">
+              Choose Regular, Gold, or Diamond. Each tier has its own design and admin-set price.
             </p>
-            {antiScreenshot && (
-              <p className="text-yellow-600/80 text-xs mt-3 tracking-wide">
-                Protected preview — screenshots discouraged · official download after approval only
-              </p>
-            )}
           </motion.div>
         </section>
 
         <div className="px-4 max-w-7xl mx-auto">
-          {/* Tier picker */}
           {(pageState === 'apply' || pageState === 'whitelisted') && (
             <div className="max-w-2xl mx-auto mb-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
               {(['regular', 'gold', 'diamond'] as FanTierId[]).map((id) => {
@@ -1006,9 +870,7 @@ export default function FanCardPage() {
                     type="button"
                     onClick={() => setSelectedTier(id)}
                     className={`rounded-xl border p-4 text-left transition-all ${
-                      selected
-                        ? 'border-white/40 bg-white/10 ring-1 ring-white/30'
-                        : 'border-white/10 bg-white/5 hover:bg-white/8'
+                      selected ? 'border-white/40 bg-white/10 ring-1 ring-white/30' : 'border-white/10 bg-white/5 hover:bg-white/8'
                     }`}
                   >
                     <p className="text-[10px] tracking-widest text-white/50 mb-1">{style.badge}</p>
@@ -1023,7 +885,7 @@ export default function FanCardPage() {
           )}
 
           {(pageState === 'apply' || pageState === 'whitelisted') && (
-            <section className="mb-12">
+            <section className="mb-10">
               <FanCard3D {...cardProps} />
               {showUnverifiedWatermark && pageState === 'apply' && (
                 <p className="text-center text-yellow-500/70 text-xs tracking-widest mt-2">
@@ -1044,17 +906,10 @@ export default function FanCardPage() {
                   maxLength={28}
                   className="w-full bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-center focus:outline-none focus:border-jcvd-red placeholder:text-white/20"
                 />
-                <button
-                  type="button"
-                  onClick={handleExport}
-                  disabled
-                  className="w-full bg-white/10 text-white/50 py-3 rounded-xl font-bold tracking-widest cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  <Download size={18} />
-                  Download after approval
+                <button type="button" disabled className="w-full bg-white/10 text-white/50 py-3 rounded-xl font-bold tracking-widest cursor-not-allowed flex items-center justify-center gap-2">
+                  <Download size={18} /> Download after approval
                 </button>
               </div>
-
               <section className="max-w-2xl mx-auto">
                 <ApplicationForm
                   wallets={wallets}
@@ -1076,23 +931,11 @@ export default function FanCardPage() {
                 <CheckCircle size={48} className="text-green-400 mx-auto" />
                 <div>
                   <h3 className="text-2xl font-bold text-white mb-2">Payment Submitted!</h3>
-                  <p className="text-green-300 mb-2">
-                    Request received for <span className="font-bold">{cardName}</span>
-                  </p>
-                  <p className="text-white/70 text-sm mb-4">
-                    Tier: <span className="font-semibold text-white">{tiers[selectedTier].label}</span>
-                  </p>
-                  <p className="text-gray-400 text-sm">
-                    Admin will verify shortly. Email:{' '}
-                    <span className="font-mono text-white">{submittedEmail}</span>
-                  </p>
+                  <p className="text-green-300 mb-2">Request for <span className="font-bold">{cardName}</span></p>
+                  <p className="text-white/70 text-sm mb-4">Tier: <span className="font-semibold text-white">{tiers[selectedTier].label}</span></p>
+                  <p className="text-gray-400 text-sm">Email: <span className="font-mono text-white">{submittedEmail}</span></p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={loginLoading}
-                  className="w-full bg-jcvd-red hover:bg-red-700 text-white py-3 rounded-xl font-bold tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
-                >
+                <button type="button" onClick={handleGoogleSignIn} disabled={loginLoading} className="w-full bg-jcvd-red hover:bg-red-700 text-white py-3 rounded-xl font-bold tracking-widest disabled:opacity-50 flex items-center justify-center gap-2">
                   {loginLoading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
                   {loginLoading ? 'Signing In...' : 'Sign In with Google'}
                 </button>
@@ -1101,20 +944,14 @@ export default function FanCardPage() {
           )}
 
           {pageState === 'awaiting' && (
-            <section className="max-w-2xl mx-auto space-y-6">
+            <section className="max-w-2xl mx-auto">
               <div className="bg-blue-900/20 border border-blue-800/50 rounded-2xl p-8 text-center space-y-6">
                 <Clock size={48} className="text-blue-400 mx-auto" />
                 <div>
                   <h3 className="text-2xl font-bold text-white mb-2">Payment Under Review</h3>
-                  <p className="text-blue-300">
-                    Your card stays watermarked until admin confirms payment.
-                  </p>
+                  <p className="text-blue-300">Your card stays watermarked until admin confirms payment.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => logout()}
-                  className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold tracking-widest"
-                >
+                <button type="button" onClick={() => logout()} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold tracking-widest">
                   Sign Out
                 </button>
               </div>
@@ -1126,9 +963,7 @@ export default function FanCardPage() {
               <div className="bg-green-900/20 border border-green-800/50 rounded-xl p-4 text-center">
                 <CheckCircle size={32} className="text-green-400 mx-auto mb-2" />
                 <h3 className="text-white font-bold">Payment Verified!</h3>
-                <p className="text-green-300 text-sm mt-1">
-                  Download a clean official {tiers[selectedTier].label} card (no watermark).
-                </p>
+                <p className="text-green-300 text-sm mt-1">Download a clean official card (no watermark).</p>
               </div>
               <input
                 type="text"
@@ -1138,38 +973,22 @@ export default function FanCardPage() {
                 maxLength={28}
                 className="w-full bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-center focus:outline-none focus:border-jcvd-red"
               />
-              <button
-                type="button"
-                onClick={handleExport}
-                disabled={!cardName || exporting}
-                className="w-full bg-jcvd-red hover:bg-red-700 text-white py-3 rounded-xl font-bold tracking-widest disabled:opacity-50 flex items-center justify-center gap-2"
-              >
+              <button type="button" onClick={handleExport} disabled={!cardName || exporting} className="w-full bg-jcvd-red hover:bg-red-700 text-white py-3 rounded-xl font-bold tracking-widest disabled:opacity-50 flex items-center justify-center gap-2">
                 <Download size={18} />
                 {exporting ? 'Generating clean PDF...' : 'DOWNLOAD OFFICIAL CARD'}
               </button>
-              <button
-                type="button"
-                onClick={() => logout()}
-                className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold tracking-widest"
-              >
+              <button type="button" onClick={() => logout()} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold tracking-widest">
                 Sign Out
               </button>
             </section>
           )}
 
-          {/* Upgrade path */}
           {canSuggestUpgrade && nextUpgrade && (
             <section className="max-w-md mx-auto mt-10">
               <div className="rounded-xl border border-yellow-600/40 bg-yellow-950/20 p-5 text-center space-y-3">
                 <p className="text-yellow-300 text-sm font-bold tracking-widest">UPGRADE AVAILABLE</p>
                 <p className="text-gray-300 text-sm">
-                  You&apos;re a{' '}
-                  <span className="text-white font-semibold">
-                    {tiers[ownedTier || 'regular'].label}
-                  </span>
-                  . Step up to{' '}
-                  <span className="text-white font-semibold">{tiers[nextUpgrade].label}</span> for a
-                  premium card design.
+                  Step up to <span className="text-white font-semibold">{tiers[nextUpgrade].label}</span>
                 </p>
                 <p className="text-xl font-black" style={{ color: TIER_STYLE[nextUpgrade].accent }}>
                   ${(tiers[nextUpgrade].price / 100).toFixed(2)}
@@ -1197,7 +1016,6 @@ export default function FanCardPage() {
           )}
         </div>
       </main>
-
       <Footer />
     </div>
   )
