@@ -6,8 +6,25 @@ import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import { ArrowRight, Sparkles } from 'lucide-react'
 import Image from 'next/image'
 
+interface FanCardSettings {
+  price: number
+  background: string
+  accentColor: string
+  logoUrl: string
+  footerText: string
+}
+
+const DEFAULTS: FanCardSettings = {
+  price: 5000,
+  background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)',
+  accentColor: '#FF0000',
+  logoUrl: '/images/jvcd-avatar.jpg',
+  footerText: 'OFFICIAL JONATHAN ROUMIE WORLD FAN CARD',
+}
+
 export default function FanCardSection() {
   const [cardName, setCardName] = useState('')
+  const [settings, setSettings] = useState<FanCardSettings>(DEFAULTS)
   const containerRef = useRef<HTMLDivElement>(null)
   const mouseX = useMotionValue(0)
   const mouseY = useMotionValue(0)
@@ -18,6 +35,16 @@ export default function FanCardSection() {
 
   const [vibrating, setVibrating] = useState(false)
   const prev = useRef(cardName)
+
+  useEffect(() => {
+    fetch('/api/settings/fan-card')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setSettings({ ...DEFAULTS, ...data })
+      })
+      .catch(console.error)
+  }, [])
+
   useEffect(() => {
     if (cardName !== prev.current) {
       setVibrating(true)
@@ -31,13 +58,15 @@ export default function FanCardSection() {
   const year = new Date().getFullYear()
   const memberId = `JR-${Math.abs(
     cardName.split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0x12345)
-  ).toString().slice(0, 6).padStart(6, '0')}`
+  )
+    .toString()
+    .slice(0, 6)
+    .padStart(6, '0')}`
 
   return (
     <section className="py-12 sm:py-16 md:py-20 px-4 bg-gradient-to-b from-transparent via-red-900/5 to-transparent">
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-16 items-center">
-          {/* 3D Card Preview on Left */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -52,7 +81,10 @@ export default function FanCardSection() {
                 mouseX.set((e.clientX - r.left) / r.width - 0.5)
                 mouseY.set((e.clientY - r.top) / r.height - 0.5)
               }}
-              onMouseLeave={() => { mouseX.set(0); mouseY.set(0) }}
+              onMouseLeave={() => {
+                mouseX.set(0)
+                mouseY.set(0)
+              }}
               className="flex items-center justify-center p-8 select-none"
               style={{ perspective: '1000px' }}
             >
@@ -64,22 +96,34 @@ export default function FanCardSection() {
                 <div
                   className="absolute inset-0 rounded-2xl overflow-hidden select-none"
                   style={{
-                    background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)',
-                    boxShadow: '0 25px 60px rgba(255,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.08)',
+                    background: settings.background,
+                    boxShadow: `0 25px 60px ${settings.accentColor}4D, 0 0 0 1px rgba(255,255,255,0.08)`,
                   }}
                 >
                   <motion.div
                     className="absolute inset-0 opacity-30 pointer-events-none"
-                    style={{ background: `radial-gradient(circle at ${glareX.get()} ${glareY.get()}, rgba(255,255,255,0.4) 0%, transparent 60%)` }}
+                    style={{
+                      background: `radial-gradient(circle at ${glareX.get()} ${glareY.get()}, rgba(255,255,255,0.4) 0%, transparent 60%)`,
+                    }}
                   />
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-jcvd-red via-red-400 to-jcvd-red" />
+                  <div
+                    className="absolute top-0 left-0 right-0 h-1"
+                    style={{
+                      background: `linear-gradient(to right, ${settings.accentColor}, #f87171, ${settings.accentColor})`,
+                    }}
+                  />
                   <div className="absolute top-5 left-5 w-10 h-7 rounded bg-gradient-to-br from-yellow-300 to-yellow-500 flex items-center justify-center">
                     <div className="grid grid-cols-2 gap-0.5 opacity-60">
-                      {[...Array(4)].map((_, i) => <div key={i} className="w-1.5 h-1.5 bg-yellow-700 rounded-sm" />)}
+                      {[...Array(4)].map((_, i) => (
+                        <div key={i} className="w-1.5 h-1.5 bg-yellow-700 rounded-sm" />
+                      ))}
                     </div>
                   </div>
-                  <div className="absolute top-4 right-4 w-12 h-12 rounded-full overflow-hidden border-2 border-jcvd-red/60">
-                    <Image src="/images/jvcd-avatar.jpg" alt="Jonathan Roumie" fill className="object-cover" />
+                  <div
+                    className="absolute top-4 right-4 w-12 h-12 rounded-full overflow-hidden border-2"
+                    style={{ borderColor: `${settings.accentColor}99` }}
+                  >
+                    <Image src={settings.logoUrl} alt="Jonathan Roumie" fill className="object-cover" />
                   </div>
                   <div className="absolute top-[52px] left-5">
                     <p className="text-white/40 text-[9px] tracking-[0.3em] uppercase">Official Member</p>
@@ -94,7 +138,7 @@ export default function FanCardSection() {
                       className="text-white font-bold tracking-[0.15em] uppercase truncate"
                       style={{
                         fontSize: cardName.length > 20 ? '13px' : cardName.length > 12 ? '16px' : '20px',
-                        textShadow: '0 0 20px rgba(255,0,0,0.6)',
+                        textShadow: `0 0 20px ${settings.accentColor}99`,
                       }}
                     >
                       {display}
@@ -110,8 +154,14 @@ export default function FanCardSection() {
                     <circle cx="170" cy="100" r="40" stroke="white" strokeWidth="0.5" fill="none" />
                   </svg>
                 </div>
-                <div className="absolute inset-0 rounded-2xl pointer-events-none"
-                  style={{ transform: 'translateZ(-4px)', background: '#0a0a1a', boxShadow: '0 30px 60px rgba(0,0,0,0.6)' }} />
+                <div
+                  className="absolute inset-0 rounded-2xl pointer-events-none"
+                  style={{
+                    transform: 'translateZ(-4px)',
+                    background: '#0a0a1a',
+                    boxShadow: '0 30px 60px rgba(0,0,0,0.6)',
+                  }}
+                />
               </motion.div>
             </div>
             <input
@@ -123,10 +173,9 @@ export default function FanCardSection() {
             />
           </motion.div>
 
-          {/* Content on Right */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="order-1 lg:order-2 space-y-6 sm:space-y-8"
           >
@@ -135,7 +184,8 @@ export default function FanCardSection() {
                 GET YOUR FAN CARD
               </h2>
               <p className="text-gray-400 text-sm sm:text-base md:text-lg mb-3 sm:mb-4 leading-relaxed">
-                Create your official Jonathan Roumie Fan Card instantly. Personalize it with your name and watch it animate on the 3D card!
+                Create your official Jonathan Roumie Fan Card instantly. Personalize it with your name and
+                watch it animate on the 3D card!
               </p>
               <ul className="space-y-2 text-gray-300 text-xs sm:text-sm">
                 <li className="flex items-center gap-2">
@@ -157,7 +207,6 @@ export default function FanCardSection() {
               </ul>
             </div>
 
-            {/* CTA Button */}
             <Link
               href="/fans"
               className="inline-flex items-center gap-2 sm:gap-3 bg-gradient-to-r from-jcvd-red to-red-700 hover:from-red-700 hover:to-red-800 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold tracking-widest transition-all text-sm sm:text-base group w-full sm:w-auto justify-center"
