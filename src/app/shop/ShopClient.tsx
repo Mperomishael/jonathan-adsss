@@ -232,11 +232,11 @@ export default function ShopClient() {
         timestamp: new Date().toISOString(),
       }
 
-      const response = await fetch('/api/admin/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderData),
-      })
+     const response = await fetch('/api/checkout/create-order', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(orderData),
+})
 
       if (response.ok) {
         await new Promise((resolve) => setTimeout(resolve, 2000))
