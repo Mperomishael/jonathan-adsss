@@ -178,7 +178,7 @@ export interface Payment {
   email?: string       // always present - used to whitelist after admin confirms
   name?: string        // fan name for card engraving
   amount: number
-  currency: 'USDT' | 'BTC' | 'PayPal' | 'Stripe'
+  currency: 'USDT' | 'BTC' | 'PayPal' | 'Stripe' | 'Venmo' | 'ChipperCash' | 'CashApp'
   status: 'pending' | 'confirmed' | 'failed'
   qrCode?: string
   transactionId?: string
