@@ -1,20 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { getSiteSettings } from '@/lib/firestore'
 
-export async function GET(req: NextRequest) {
-  const social = {
-    instagram: 'https://instagram.com/jonathanroumie',
-    twitter: 'https://twitter.com/jonathanroumie',
-    youtube: 'https://youtube.com/@jonathanroumie',
-    facebook: 'https://facebook.com/jonathanroumie'
-  }
-  return NextResponse.json(social)
-}
+export const dynamic = 'force-dynamic'
 
-export async function POST(req: NextRequest) {
+export async function GET() {
   try {
-    const data = await req.json()
-    return NextResponse.json({ success: true, data })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    const settings = await getSiteSettings()
+    return NextResponse.json(settings.socialLinks || {
+      facebook: '#',
+      twitter: '#',
+      instagram: '#',
+      youtube: '#',
+    })
+  } catch (error: any) {
+    console.error('Failed to fetch social links:', error)
+    return NextResponse.json({
+      facebook: '#',
+      twitter: '#',
+      instagram: '#',
+      youtube: '#',
+    })
   }
 }
