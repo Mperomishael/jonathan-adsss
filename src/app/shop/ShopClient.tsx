@@ -548,4 +548,372 @@ export default function ShopClient() {
               {/* CUSTOMER DETAILS */}
               {checkoutStep === 'customer' && (
                 <>
-                  <div className="bg-blue-600/20 border border-blue-600/50 rounded-lg p-4
+                  <div className="bg-blue-600/20 border border-blue-600/50 rounded-lg p-4">
+                    <p className="text-blue-400 text-sm font-bold">STEP 1 OF 3: ENTER YOUR DETAILS</p>
+                  </div>
+
+                  <form onSubmit={handleCustomerDetailsSubmit} className="space-y-4">
+                    <div>
+                      <label className="text-white text-sm font-bold block mb-2">EMAIL *</label>
+                      <input
+                        type="email"
+                        value={customerDetails.email}
+                        onChange={(e) =>
+                          setCustomerDetails({ ...customerDetails, email: e.target.value })
+                        }
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                        placeholder="your@email.com"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-white text-sm font-bold block mb-2">PHONE NUMBER *</label>
+                      <input
+                        type="tel"
+                        value={customerDetails.phone}
+                        onChange={(e) =>
+                          setCustomerDetails({ ...customerDetails, phone: e.target.value })
+                        }
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                        placeholder="+1 (555) 123-4567"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-white text-sm font-bold block mb-2">ADDRESS *</label>
+                      <input
+                        type="text"
+                        value={customerDetails.address}
+                        onChange={(e) =>
+                          setCustomerDetails({ ...customerDetails, address: e.target.value })
+                        }
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                        placeholder="123 Main St, City, State ZIP"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-white text-sm font-bold block mb-2">
+                        ALTERNATIVE PHONE (Optional)
+                      </label>
+                      <input
+                        type="tel"
+                        value={customerDetails.altPhone}
+                        onChange={(e) =>
+                          setCustomerDetails({ ...customerDetails, altPhone: e.target.value })
+                        }
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                        placeholder="Backup phone number"
+                      />
+                    </div>
+
+                    <div className="flex gap-3">
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="button"
+                        onClick={() => setCheckoutStep('cart')}
+                        className="flex-1 bg-white/10 text-white font-bold py-3 rounded-lg hover:bg-white/20 transition-all"
+                      >
+                        BACK
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="submit"
+                        className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-3 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all"
+                      >
+                        CONTINUE TO PAYMENT
+                      </motion.button>
+                    </div>
+                  </form>
+                </>
+              )}
+
+              {/* PAYMENT */}
+              {checkoutStep === 'payment' && (
+                <>
+                  <div className="bg-purple-600/20 border border-purple-600/50 rounded-lg p-4">
+                    <p className="text-purple-400 text-sm font-bold">STEP 2 OF 3: SELECT PAYMENT METHOD</p>
+                  </div>
+
+                  {!payConfigLoaded ? (
+                    <div className="flex items-center justify-center py-10">
+                      <Loader2 size={28} className="text-blue-400 animate-spin" />
+                    </div>
+                  ) : !paymentMethod ? (
+                    <div className="space-y-3">
+                      {hasCrypto && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          type="button"
+                          onClick={() => handlePaymentMethodSelect('crypto')}
+                          className="w-full bg-gradient-to-r from-yellow-600 to-yellow-700 text-white font-bold py-4 rounded-lg hover:from-yellow-700 hover:to-yellow-800 transition-all text-left px-6"
+                        >
+                          <div className="font-bold text-lg">CRYPTO (BTC / USDT)</div>
+                          <div className="text-sm text-yellow-100">Secure blockchain payment</div>
+                        </motion.button>
+                      )}
+
+                      {hasCashapp && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          type="button"
+                          onClick={() => handlePaymentMethodSelect('cashapp')}
+                          className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 rounded-lg hover:from-green-700 hover:to-green-800 transition-all text-left px-6"
+                        >
+                          <div className="font-bold text-lg">CASH APP</div>
+                          <div className="text-sm text-green-100">{payConfig.cashapp?.handle}</div>
+                        </motion.button>
+                      )}
+
+                      {hasVenmo && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          type="button"
+                          onClick={() => handlePaymentMethodSelect('venmo')}
+                          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-4 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all text-left px-6"
+                        >
+                          <div className="font-bold text-lg">VENMO</div>
+                          <div className="text-sm text-blue-100">{payConfig.venmo?.handle}</div>
+                        </motion.button>
+                      )}
+
+                      {hasChipper && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          type="button"
+                          onClick={() => handlePaymentMethodSelect('chipper')}
+                          className="w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white font-bold py-4 rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all text-left px-6"
+                        >
+                          <div className="font-bold text-lg">CHIPPER CASH</div>
+                          <div className="text-sm text-purple-100">{payConfig.chipperCash?.handle}</div>
+                        </motion.button>
+                      )}
+
+                      {!hasAnyPayment && (
+                        <p className="text-gray-400 text-sm text-center py-8">
+                          No payment methods configured yet. Please check back soon.
+                        </p>
+                      )}
+
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="button"
+                        onClick={() => setCheckoutStep('customer')}
+                        className="w-full bg-white/10 text-white font-bold py-3 rounded-lg hover:bg-white/20 transition-all"
+                      >
+                        BACK
+                      </motion.button>
+                    </div>
+                  ) : (
+                    <>
+                      {paymentMethod === 'crypto' && !cryptoType && (
+                        <div className="space-y-3">
+                          <p className="text-white font-bold text-sm">SELECT CRYPTO TYPE:</p>
+                          {hasBtc && (
+                            <motion.button
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              type="button"
+                              onClick={() => setCryptoType('btc')}
+                              className="w-full bg-orange-600 text-white font-bold py-3 rounded-lg hover:bg-orange-700 transition-all"
+                            >
+                              BITCOIN (BTC)
+                            </motion.button>
+                          )}
+                          {hasUsdt && (
+                            <motion.button
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              type="button"
+                              onClick={() => setCryptoType('usdt')}
+                              className="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition-all"
+                            >
+                              USDT (TETHER)
+                            </motion.button>
+                          )}
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            type="button"
+                            onClick={() => {
+                              setPaymentMethod('')
+                              setCryptoType('')
+                            }}
+                            className="w-full bg-white/10 text-white font-bold py-3 rounded-lg hover:bg-white/20 transition-all"
+                          >
+                            CHANGE PAYMENT METHOD
+                          </motion.button>
+                        </div>
+                      )}
+
+                      {(paymentMethod !== 'crypto' || cryptoType) && (
+                        <>
+                          <div className="bg-white/5 border border-white/10 rounded-lg p-6 space-y-4">
+                            <div>
+                              <p className="text-gray-400 text-sm mb-3">SEND PAYMENT TO:</p>
+
+                              {paymentMethod === 'crypto' ? (
+                                <>
+                                  <p className="text-white text-xs mb-2">
+                                    Wallet Address ({cryptoType?.toUpperCase()}):
+                                  </p>
+                                  <div className="bg-black/40 rounded px-4 py-3 break-all">
+                                    <p className="text-green-400 font-bold text-sm font-mono">
+                                      {activeCryptoAddress || 'Address not available'}
+                                    </p>
+                                  </div>
+                                </>
+                              ) : paymentMethod === 'cashapp' ? (
+                                <>
+                                  <p className="text-white text-xs mb-2">Cash App Handle:</p>
+                                  <div className="bg-black/40 rounded px-4 py-3">
+                                    <p className="text-green-400 font-bold text-lg">
+                                      {payConfig.cashapp?.handle}
+                                    </p>
+                                  </div>
+                                </>
+                              ) : paymentMethod === 'venmo' ? (
+                                <>
+                                  <p className="text-white text-xs mb-2">Venmo Handle:</p>
+                                  <div className="bg-black/40 rounded px-4 py-3">
+                                    <p className="text-blue-400 font-bold text-lg">
+                                      {payConfig.venmo?.handle}
+                                    </p>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-white text-xs mb-2">Chipper Cash Handle:</p>
+                                  <div className="bg-black/40 rounded px-4 py-3">
+                                    <p className="text-purple-400 font-bold text-lg">
+                                      {payConfig.chipperCash?.handle}
+                                    </p>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+
+                            <div className="border-t border-white/10 pt-4">
+                              <p className="text-white font-bold text-lg mb-2">ORDER TOTAL</p>
+                              <p className="text-blue-400 text-3xl font-bold">${totalPrice.toFixed(2)}</p>
+                            </div>
+                          </div>
+
+                          <div className="bg-yellow-600/20 border border-yellow-600/50 rounded-lg p-4">
+                            <p className="text-yellow-400 text-xs font-bold mb-2">PAYMENT INSTRUCTIONS</p>
+                            <p className="text-yellow-300 text-xs">
+                              Include your email ({customerDetails.email}) in the payment note for order
+                              confirmation.
+                            </p>
+                          </div>
+
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            type="button"
+                            onClick={handlePaymentConfirmation}
+                            className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-4 rounded-lg hover:from-green-700 hover:to-green-800 transition-all text-lg"
+                          >
+                            I HAVE PAID ✓
+                          </motion.button>
+
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            type="button"
+                            onClick={() => {
+                              setPaymentMethod('')
+                              setCryptoType('')
+                            }}
+                            className="w-full bg-white/10 text-white font-bold py-3 rounded-lg hover:bg-white/20 transition-all"
+                          >
+                            CHANGE PAYMENT METHOD
+                          </motion.button>
+                        </>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* CONFIRMATION */}
+              {checkoutStep === 'confirmation' && (
+                <>
+                  <div className="text-center space-y-4 py-8">
+                    <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto">
+                      <div className="text-white text-3xl font-bold">✓</div>
+                    </div>
+                    <h3 className="text-white text-2xl font-bold">ORDER RECEIVED!</h3>
+                    <p className="text-gray-400">Thank you for your purchase!</p>
+                  </div>
+
+                  <div className="bg-green-600/20 border border-green-600/50 rounded-lg p-4 space-y-3">
+                    <div>
+                      <p className="text-green-400 text-xs font-bold mb-1">ORDER CONFIRMATION</p>
+                      <p className="text-white">Email confirmation will be sent to:</p>
+                      <p className="text-blue-400 font-bold break-all">{customerDetails.email}</p>
+                    </div>
+                    <div className="border-t border-green-600/30 pt-3">
+                      <p className="text-green-400 text-xs font-bold mb-1">NEXT STEPS</p>
+                      <p className="text-gray-300 text-sm">1. Check your email for order details</p>
+                      <p className="text-gray-300 text-sm">2. Admin will verify your payment</p>
+                      <p className="text-gray-300 text-sm">3. Your order will be processed & shipped</p>
+                    </div>
+                  </div>
+
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={resetCheckout}
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold py-4 rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all"
+                  >
+                    CONTINUE SHOPPING
+                  </motion.button>
+                </>
+              )}
+
+              {/* LOADER */}
+              {checkoutStep === 'loader' && (
+                <div className="text-center py-12 space-y-6">
+                  <Loader2 size={56} className="text-blue-500 animate-spin mx-auto" />
+                  <div>
+                    <h3 className="text-white text-xl font-bold mb-2">PROCESSING YOUR ORDER</h3>
+                    <p className="text-gray-400">Please wait while we confirm your order...</p>
+                  </div>
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-4 text-left space-y-2">
+                    <p className="text-gray-400 text-sm">Order Details:</p>
+                    <p className="text-white text-sm">
+                      <span className="text-gray-500">Items:</span> {cart.length} product(s)
+                    </p>
+                    <p className="text-white text-sm">
+                      <span className="text-gray-500">Total:</span> ${totalPrice.toFixed(2)}
+                    </p>
+                    <p className="text-white text-sm">
+                      <span className="text-gray-500">Method:</span>{' '}
+                      {paymentMethod === 'crypto'
+                        ? cryptoType?.toUpperCase()
+                        : paymentMethod?.toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      <Footer variant="shop" />
+    </div>
+  )
+}
