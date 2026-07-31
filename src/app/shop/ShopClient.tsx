@@ -391,4 +391,161 @@ export default function ShopClient() {
                     />
                     <button
                       type="button"
-                      onClick
+                      onClick={() =>
+                        setSelectedQuantity({
+                          ...selectedQuantity,
+                          [product.id]: Math.min(product.stock, (selectedQuantity[product.id] || 1) + 1),
+                        })
+                      }
+                      className="text-white/60 hover:text-white px-2 py-1 text-sm"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => addToCart(product)}
+                    disabled={product.stock === 0}
+                    className={`w-full py-2 sm:py-3 font-bold text-sm sm:text-base rounded transition-all ${
+                      product.stock === 0
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800'
+                    }`}
+                  >
+                    {product.stock === 0 ? 'OUT OF STOCK' : 'ADD TO CART'}
+                  </motion.button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      {/* Checkout Modal */}
+      {checkoutOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-4"
+          onClick={() => !isLoading && resetCheckout()}
+        >
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            className="bg-gradient-to-b from-gray-900 to-black w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 p-4 sm:p-6 flex justify-between items-center">
+              <h2 className="text-white font-bold text-lg sm:text-2xl tracking-widest">
+                {checkoutStep === 'loader'
+                  ? 'PROCESSING'
+                  : checkoutStep === 'confirmation'
+                    ? 'SUCCESS'
+                    : 'CHECKOUT'}
+              </h2>
+              {checkoutStep !== 'loader' && (
+                <motion.button
+                  whileHover={{ rotate: 90 }}
+                  onClick={resetCheckout}
+                  className="text-white hover:bg-white/20 p-2 rounded-full"
+                >
+                  <X size={24} />
+                </motion.button>
+              )}
+            </div>
+
+            <div className="p-4 sm:p-6 space-y-6">
+              {/* CART */}
+              {checkoutStep === 'cart' && (
+                <>
+                  {cart.length === 0 ? (
+                    <div className="text-center py-12">
+                      <ShoppingCart size={48} className="text-gray-600 mx-auto mb-4" />
+                      <p className="text-gray-400 text-lg">Your cart is empty</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-4">
+                        {cart.map((item) => (
+                          <div
+                            key={item.id}
+                            className="bg-white/5 border border-white/10 rounded-lg p-3 sm:p-4 flex gap-3 sm:gap-4"
+                          >
+                            <img
+                              src={item.image}
+                              alt={item.name}
+                              className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-white font-bold text-sm sm:text-base line-clamp-2">
+                                {item.name}
+                              </h3>
+                              <p className="text-blue-400 font-bold text-sm sm:text-base">
+                                ${item.price.toFixed(2)}
+                              </p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                  className="text-white/60 hover:text-white px-1 py-0.5"
+                                >
+                                  −
+                                </button>
+                                <span className="text-white font-bold text-sm min-w-[30px] text-center">
+                                  {item.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                  className="text-white/60 hover:text-white px-1 py-0.5"
+                                >
+                                  +
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeFromCart(item.id)}
+                                  className="ml-auto text-red-500 hover:text-red-400 text-sm"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-white font-bold text-sm sm:text-base">
+                                ${(item.price * item.quantity).toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="border-t border-white/10 pt-4">
+                        <div className="flex justify-between items-center mb-6">
+                          <span className="text-white text-lg sm:text-xl font-bold">TOTAL:</span>
+                          <span className="text-blue-400 text-2xl sm:text-3xl font-bold">
+                            ${totalPrice.toFixed(2)}
+                          </span>
+                        </div>
+
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => setCheckoutStep('customer')}
+                          className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white font-bold py-3 sm:py-4 rounded-lg hover:from-green-700 hover:to-green-800 transition-all text-sm sm:text-base"
+                        >
+                          CONTINUE TO CHECKOUT
+                        </motion.button>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* CUSTOMER DETAILS */}
+              {checkoutStep === 'customer' && (
+                <>
+                  <div className="bg-blue-600/20 border border-blue-600/50 rounded-lg p-4
