@@ -608,6 +608,386 @@ function ApplicationForm({
       </button>
 
       <p className="text-center text-gray-600 text-xs">
-        Only submit after you have actually sent the payment. system verifies every payment automatically.
+        Only submit after you have actually sent the payment. Admin verifies every payment manually.
       </p>
-   
+    </div>
+  )
+}
+
+// ─── Main Page ─────────────────────────────────────────────────────────────────
+
+export default function FanCardPage() {
+  const { user, loading: authLoading, whitelisted, login, logout, getToken } = useUserAuth()
+
+  const { data: firestoreWallets } = useFirestoreListener<CryptoWalletsData>('pageSettings', 'cryptoWallets')
+  const { data: fanCardSettings } = useFirestoreListener<{ price?: number }>('pageSettings', 'fanCard')
+
+  const [pageState, setPageState] = useState<PageState>('loading')
+  const [submittedEmail, setSubmittedEmail] = useState('')
+  const [wallets, setWallets] = useState<Wallets>({})
+  const [payMethods, setPayMethods] = useState<PaymentMethodsConfig>({})
+  const [price, setPrice] = useState(499)
+  const [cardName, setCardName] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [loginLoading, setLoginLoading] = useState(false)
+
+  const cardRef = useRef<HTMLDivElement>(null)
+  const canDownload = pageState === 'whitelisted'
+
+  const memberId = `JR-${Math.abs(
+    cardName.split('').reduce((a, c) => ((a << 5) - a + c.charCodeAt(0)) | 0, 0x12345)
+  )
+    .toString()
+    .slice(0, 6)
+    .padStart(6, '0')}`
+
+  // Live wallets from Firestore
+  useEffect(() => {
+    if (firestoreWallets) {
+      const next: Wallets = {}
+      if (firestoreWallets.btc?.address) next.btc = { address: firestoreWallets.btc.address }
+      if (firestoreWallets.usdt?.address) next.usdt = { address: firestoreWallets.usdt.address }
+      setWallets(next)
+    }
+  }, [firestoreWallets])
+
+  // Live price from Firestore (stored in cents)
+  useEffect(() => {
+    if (fanCardSettings?.price !== undefined) {
+      setPrice(Number(fanCardSettings.price) || 499)
+      return
+    }
+    setPrice(499)
+  }, [fanCardSettings])
+
+  // Public payment methods API (handles + enabled flags + wallet addresses fallback)
+  useEffect(() => {
+    fetch('/api/checkout/payment-methods')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return
+        setPayMethods(data)
+        setWallets((prev) => ({
+          btc: data.crypto?.btc?.address ? { address: data.crypto.btc.address } : prev.btc,
+          usdt: data.crypto?.usdt?.address ? { address: data.crypto.usdt.address } : prev.usdt,
+        }))
+      })
+      .catch(console.error)
+  }, [])
+
+  // Auth / whitelist state
+  useEffect(() => {
+    if (authLoading) {
+      setPageState('loading')
+      return
+    }
+
+    if (user) {
+      if (whitelisted) {
+        setPageState('whitelisted')
+      } else {
+        const checkStatus = async () => {
+          try {
+            const token = await getToken()
+            if (!token) {
+              setPageState('apply')
+              return
+            }
+            const res = await fetch('/api/user/status', {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            if (!res.ok) {
+              setPageState('apply')
+              return
+            }
+            const data = await res.json()
+            if (data.paymentStatus === 'pending' || data.paymentStatus === 'confirmed') {
+              setPageState('awaiting')
+            } else {
+              setPageState('apply')
+            }
+          } catch {
+            setPageState('apply')
+          }
+        }
+        checkStatus()
+      }
+    } else {
+      setPageState((prev) => (prev === 'submitted' ? 'submitted' : 'apply'))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading, whitelisted])
+
+  const handlePaymentSuccess = async (email: string) => {
+    setSubmittedEmail(email)
+    setPageState('submitted')
+    setTimeout(async () => {
+      try {
+        await login()
+      } catch {
+        // user can sign in manually
+      }
+    }, 2200)
+  }
+
+  const handleGoogleSignIn = async () => {
+    setLoginLoading(true)
+    try {
+      await login()
+    } catch {
+      setLoginLoading(false)
+    }
+  }
+
+  const handleExport = async () => {
+    if (!cardName.trim()) {
+      alert('Enter your name to engrave on the card first.')
+      return
+    }
+
+    if (pageState !== 'whitelisted') {
+      alert(
+        'Downloads are only available after payment is verified and approved by admin. Please complete payment and wait for approval before downloading your Fan Card.'
+      )
+      return
+    }
+
+    setExporting(true)
+    try {
+      const { default: html2canvas } = await import('html2canvas')
+      const { jsPDF } = await import('jspdf')
+      if (!cardRef.current) return
+      const canvas = await html2canvas(cardRef.current, {
+        scale: 3,
+        backgroundColor: null,
+        useCORS: true,
+      })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [85.6, 53.98] })
+      pdf.addImage(imgData, 'PNG', 0, 0, 85.6, 53.98)
+      pdf.save(`JonathanRoumie-Fan-Card-${cardName.replace(/\s+/g, '-')}.pdf`)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-black">
+      <Header variant="main" />
+
+      <main className="pt-20 pb-16">
+        <section className="text-center px-4 py-12">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-widest text-white mb-3">
+              JONATHAN ROUMIE
+            </h1>
+            <p className="text-gray-400 mb-1 text-sm tracking-widest uppercase">Official</p>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-jcvd-red tracking-widest mb-6">
+              FAN CARD
+            </h2>
+            <p className="text-gray-400 max-w-2xl mx-auto text-base leading-relaxed">
+              Own an exclusive personalized fan card. Engrave your name, complete payment, and receive your
+              digital/physical card.
+            </p>
+          </motion.div>
+        </section>
+
+        <div className="px-4 max-w-7xl mx-auto">
+          {pageState === 'apply' && (
+            <section className="mb-16">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                <FanCard3D name={cardName} memberId={memberId} cardRef={cardRef} />
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="max-w-md mx-auto space-y-4"
+              >
+                <input
+                  type="text"
+                  value={cardName}
+                  onChange={(e) => setCardName(e.target.value.slice(0, 30))}
+                  placeholder="Your Name Here"
+                  autoFocus
+                  className="w-full bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-center focus:outline-none focus:border-jcvd-red transition-colors placeholder:text-white/20"
+                />
+
+                <div className="flex gap-2 justify-center">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleExport}
+                    disabled={!cardName || exporting || !canDownload}
+                    className="flex-1 bg-jcvd-red hover:bg-red-700 text-white py-3 rounded-xl font-bold tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    <Download size={18} />
+                    {exporting
+                      ? 'Exporting...'
+                      : canDownload
+                        ? 'Download Card'
+                        : 'Download after approval'}
+                  </motion.button>
+                </div>
+              </motion.div>
+            </section>
+          )}
+
+          {pageState === 'apply' && (
+            <section className="max-w-2xl mx-auto">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <ApplicationForm
+                  wallets={wallets}
+                  methods={payMethods}
+                  price={price}
+                  onSuccess={handlePaymentSuccess}
+                  name={cardName}
+                  onNameChange={setCardName}
+                />
+              </motion.div>
+            </section>
+          )}
+
+          {pageState === 'submitted' && (
+            <section className="max-w-2xl mx-auto">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-green-900/20 border border-green-800/50 rounded-2xl p-8 text-center space-y-6"
+              >
+                <CheckCircle size={48} className="text-green-400 mx-auto" />
+                <div>
+                  <h3 className="text-2xl font-bold text-white mb-2">Payment Submitted!</h3>
+                  <p className="text-green-300 mb-4">
+                    We&apos;ve received your payment request for <span className="font-bold">{cardName}</span>
+                  </p>
+                  <p className="text-gray-400 text-sm">
+                    Admin will verify your payment shortly. Watch for an email at{' '}
+                    <span className="font-mono text-white">{submittedEmail}</span>
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={loginLoading}
+                  className="w-full bg-jcvd-red hover:bg-red-700 text-white py-3 rounded-xl font-bold tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loginLoading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
+                  {loginLoading ? 'Signing In...' : 'Sign In with Google'}
+                </button>
+
+                <p className="text-gray-500 text-xs">
+                  Use the same Google account email you provided above.
+                </p>
+              </motion.div>
+            </section>
+          )}
+
+          {pageState === 'awaiting' && (
+            <section className="max-w-2xl mx-auto">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-blue-900/20 border border-blue-800/50 rounded-2xl p-8 text-center space-y-6"
+              >
+                <Clock size={48} className="text-blue-400 mx-auto animate-spin" />
+                <div>
+                  <h3 className="text-2xl font-bold text-white mb-2">Payment Under Review</h3>
+                  <p className="text-blue-300">
+                    Your payment is being verified. You&apos;ll receive an email confirmation soon.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold tracking-widest transition-all"
+                >
+                  Sign Out
+                </button>
+              </motion.div>
+            </section>
+          )}
+
+          {pageState === 'whitelisted' && (
+            <section className="mb-16">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                <FanCard3D name={cardName} memberId={memberId} cardRef={cardRef} />
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="max-w-md mx-auto space-y-4"
+              >
+                <div className="bg-green-900/20 border border-green-800/50 rounded-xl p-4 text-center mb-4">
+                  <CheckCircle size={32} className="text-green-400 mx-auto mb-2" />
+                  <h3 className="text-white font-bold">Payment Verified!</h3>
+                  <p className="text-green-300 text-sm mt-1">Your card is now ready for download.</p>
+                </div>
+
+                <input
+                  type="text"
+                  value={cardName}
+                  onChange={(e) => setCardName(e.target.value.slice(0, 30))}
+                  placeholder="Your Name on Card"
+                  className="w-full bg-white/5 border border-white/10 text-white px-6 py-3 rounded-xl text-center focus:outline-none focus:border-jcvd-red transition-colors placeholder:text-white/20"
+                />
+
+                <div className="flex gap-2 flex-col">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleExport}
+                    disabled={!cardName || exporting}
+                    className="w-full bg-jcvd-red hover:bg-red-700 text-white py-3 rounded-xl font-bold tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    <Download size={18} />
+                    {exporting ? 'Downloading...' : 'DOWNLOAD CARD'}
+                  </motion.button>
+
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => logout()}
+                    className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold tracking-widest transition-all"
+                  >
+                    Sign Out
+                  </motion.button>
+                </div>
+              </motion.div>
+            </section>
+          )}
+
+          {pageState === 'loading' && (
+            <section className="max-w-2xl mx-auto">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
+                <Loader2 size={32} className="text-jcvd-red mx-auto animate-spin mb-4" />
+                <p className="text-gray-400">Loading...</p>
+              </motion.div>
+            </section>
+          )}
+        </div>
+      </main>
+
+      <Footer />
+    </div>
+  )
+}
