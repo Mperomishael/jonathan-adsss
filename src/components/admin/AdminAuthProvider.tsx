@@ -53,17 +53,21 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithEmailPassword = async (username: string, password: string) => {
     setError(null)
+
+    // THIS is the line that must call /api/admin/login (not /admin/login)
     const res = await fetch('/api/admin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     })
+
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
       const msg = data.error || 'Invalid credentials'
       setError(msg)
       throw new Error(msg)
     }
+
     setUser(data.user)
     setAdminRole(data.role || 'super-admin')
     setToken(data.token)
