@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Image as ImageIcon, Save, AlertCircle, Check, Upload } from 'lucide-react'
+import { Image as ImageIcon, Save, AlertCircle, Check } from 'lucide-react'
 import { useAdminAuth } from '@/components/admin/AdminAuthProvider'
+import ImageUpload from '@/components/admin/ImageUpload'
 
 interface CatalogContent {
   section: string
@@ -88,20 +89,6 @@ export default function CatalogPage() {
     }
   }
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      setFormData((prev) => ({
-        ...prev,
-        image: event.target?.result as string,
-      }))
-    }
-    reader.readAsDataURL(file)
-  }
-
   return (
     <div>
       <div className="mb-8">
@@ -184,19 +171,12 @@ export default function CatalogPage() {
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none focus:border-red-500 transition-colors text-sm resize-none"
             />
 
-            <div className="border-2 border-dashed border-white/10 rounded-lg p-4 text-center hover:border-white/20 transition-colors">
-              <label className="cursor-pointer flex flex-col items-center gap-2">
-                <Upload size={24} className="text-gray-400" />
-                <span className="text-sm text-gray-400">Click to upload image</span>
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-              </label>
-            </div>
-
-            {formData.image && (
-              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                <img src={formData.image} alt="preview" className="w-full h-full object-cover" />
-              </div>
-            )}
+            <ImageUpload
+              label="SECTION IMAGE"
+              folder="catalog"
+              value={formData.image || ''}
+              onChange={(url) => setFormData({ ...formData, image: url })}
+            />
 
             <div className="flex gap-2">
               <button
