@@ -73,6 +73,25 @@ export default function AdminFanCardPage() {
     })
   }, [firestoreSettings])
 
+  // Free-typing price strings (dollars) so inputs don't behave like spinners
+  const [priceInputs, setPriceInputs] = useState<Record<FanTierId, string>>({
+    regular: '50.00',
+    gold: '150.00',
+    diamond: '500.00',
+  })
+
+  useEffect(() => {
+    if (!firestoreSettings) return
+    const r = firestoreSettings.tiers?.regular?.price ?? firestoreSettings.price ?? DEFAULT_TIERS.regular.price
+    const g = firestoreSettings.tiers?.gold?.price ?? DEFAULT_TIERS.gold.price
+    const d = firestoreSettings.tiers?.diamond?.price ?? DEFAULT_TIERS.diamond.price
+    setPriceInputs({
+      regular: (Number(r) / 100).toFixed(2),
+      gold: (Number(g) / 100).toFixed(2),
+      diamond: (Number(d) / 100).toFixed(2),
+    })
+  }, [firestoreSettings])
+
   const updateTier = (
     id: FanTierId,
     patch: Partial<{ enabled: boolean; price: number; label: string }>
@@ -90,6 +109,22 @@ export default function AdminFanCardPage() {
       },
       price: id === 'regular' && patch.price !== undefined ? patch.price : prev.price,
     }))
+  }
+
+  const onPriceType = (id: FanTierId, raw: string) => {
+    if (raw !== '' && !/^\d*\.?\d{0,2}$/.test(raw)) return
+    setPriceInputs((prev) => ({ ...prev, [id]: raw }))
+    const d = parseFloat(raw)
+    if (Number.isFinite(d) && d >= 0) {
+      updateTier(id, { price: Math.round(d * 100) })
+    }
+  }
+
+  const onPriceBlur = (id: FanTierId) => {
+    const d = parseFloat(priceInputs[id])
+    const cents = Number.isFinite(d) && d >= 0.99 ? Math.round(d * 100) : DEFAULT_TIERS[id].price
+    updateTier(id, { price: cents })
+    setPriceInputs((prev) => ({ ...prev, [id]: (cents / 100).toFixed(2) }))
   }
 
   const handleSave = async () => {
@@ -278,16 +313,14 @@ export default function AdminFanCardPage() {
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
                     <input
-                      type="number"
-                      step="0.01"
-                      min="0.99"
-                      value={dollars}
-                      onChange={(e) => {
-                        const d = parseFloat(e.target.value)
-                        if (!Number.isFinite(d)) return
-                        updateTier(id, { price: Math.round(d * 100) })
-                      }}
-                      className="w-full bg-black/30 border border-white/10 text-white pl-7 pr-3 py-2 rounded-lg text-sm focus:outline-none focus:border-red-500"
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      placeholder="0.00"
+                      value={priceInputs[id]}
+                      onChange={(e) => onPriceType(id, e.target.value)}
+                      onBlur={() => onPriceBlur(id)}
+                      className="w-full bg-black/30 border border-white/10 text-white pl-7 pr-3 py-2 rounded-lg text-sm focus:outline-none focus:border-red-500 [appearance:textfield]"
                     />
                   </div>
                 </div>
