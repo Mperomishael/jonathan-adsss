@@ -27,15 +27,13 @@ export default function FloatingChat() {
     setThreadId(localStorage.getItem(THREAD_KEY))
   }, [])
 
-  // Load WhatsApp / chat number from site settings (admin-controlled)
   useEffect(() => {
     let alive = true
     fetch('/api/settings/site')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!alive || !data) return
-        const n = String(data.whatsappNumber || '').replace(/\D/g, '')
-        setWhatsappNumber(n)
+        setWhatsappNumber(String(data.whatsappNumber || '').replace(/\\D/g, ''))
       })
       .catch(() => {})
     return () => {
