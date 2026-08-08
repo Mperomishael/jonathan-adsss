@@ -79,10 +79,12 @@ const UPGRADE_NEXT: Partial<Record<FanTierId, FanTierId>> = {
   gold: 'diamond',
 }
 
-const DEFAULT_TIER_PRICES: Record<FanTierId, number> = {
-  regular: 5000,
-  gold: 15000,
-  diamond: 50000,
+/** Admin prices are USD dollars. Legacy integer cents (>=100) converted once. */
+function adminPriceToDollars(raw: unknown, fallback: number): number {
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return fallback
+  if (Number.isInteger(n) && n >= 100) return Math.round(n) / 100
+  return Math.round(n * 100) / 100
 }
 
 function nameFontSize(name: string): number {
@@ -443,7 +445,8 @@ function ApplicationForm({
   }, [options.join('|')])
 
   const waybillPrice = 23.0
-  const priceUsd = (priceCents / 100).toFixed(2)
+  // priceCents prop is actually USD dollars from admin (kept name for minimal churn)
+  const priceUsd = Number(priceCents).toFixed(2)
   const totalPrice = addWaybill ? (parseFloat(priceUsd) + waybillPrice).toFixed(2) : priceUsd
 
   const handleSubmit = async () => {
@@ -626,41 +629,119 @@ export default function FanCardPage() {
   const [exportClean, setExportClean] = useState(false)
   const [selectedTier, setSelectedTier] = useState<FanTierId>('regular')
   const [ownedTier, setOwnedTier] = useState<FanTierId | null>(null)
+  // Admin-driven prices (USD dollars) — never hardcode display values
+  const [adminTiers, setAdminTiers] = useState<Record<
+    FanTierId,
+    { enabled: boolean; price: number; label: string }
+  > | null>(null)
+  const [adminMeta, setAdminMeta] = useState<{
+    logoUrl?: string
+    footerText?: string
+    antiScreenshot?: boolean
+  }>({})
 
   const cardRef = useRef<HTMLDivElement>(null)
   const canDownload = pageState === 'whitelisted'
-  const antiScreenshot = fanCardSettings?.antiScreenshot !== false
-  const logoUrl = fanCardSettings?.logoUrl || '/images/jvcd-avatar.jpg'
-  const footerText = fanCardSettings?.footerText || 'OFFICIAL JONATHAN ROUMIE WORLD FAN CARD'
 
-  const tiers: Record<FanTierId, { enabled: boolean; price: number; label: string }> = {
-    regular: {
-      enabled: fanCardSettings?.tiers?.regular?.enabled !== false,
-      price: Number(fanCardSettings?.tiers?.regular?.price ?? fanCardSettings?.price ?? DEFAULT_TIER_PRICES.regular),
-      label: fanCardSettings?.tiers?.regular?.label || 'Regular Fan',
-    },
-    gold: {
-      enabled: fanCardSettings?.tiers?.gold?.enabled !== false,
-      price: Number(fanCardSettings?.tiers?.gold?.price ?? DEFAULT_TIER_PRICES.gold),
-      label: fanCardSettings?.tiers?.gold?.label || 'Gold Fan',
-    },
-    diamond: {
-      enabled: fanCardSettings?.tiers?.diamond?.enabled !== false,
-      price: Number(fanCardSettings?.tiers?.diamond?.price ?? DEFAULT_TIER_PRICES.diamond),
-      label: fanCardSettings?.tiers?.diamond?.label || 'Diamond Fan',
-    },
-  }
+  // Load admin settings via public API (authoritative) + merge live Firestore updates
+  useEffect(() => {
+    let alive = true
+    const apply = (data: any) => {
+      if (!alive || !data) return
+      const src = data.tiers || {}
+      setAdminTiers({
+        regular: {
+          enabled: src.regular?.enabled !== false,
+          price: adminPriceToDollars(src.regular?.price ?? data.price, 50),
+          label: src.regular?.label || 'Regular Fan',
+        },
+        gold: {
+          enabled: src.gold?.enabled !== false,
+          price: adminPriceToDollars(src.gold?.price, 150),
+          label: src.gold?.label || 'Gold Fan',
+        },
+        diamond: {
+          enabled: src.diamond?.enabled !== false,
+          price: adminPriceToDollars(src.diamond?.price, 500),
+          label: src.diamond?.label || 'Diamond Fan',
+        },
+      })
+      setAdminMeta({
+        logoUrl: data.logoUrl,
+        footerText: data.footerText,
+        antiScreenshot: data.antiScreenshot !== false,
+      })
+    }
+    fetch('/api/settings/fan-card')
+      .then((r) => (r.ok ? r.json() : null))
+      .then(apply)
+      .catch(() => {})
+    const poll = setInterval(() => {
+      fetch('/api/settings/fan-card')
+        .then((r) => (r.ok ? r.json() : null))
+        .then(apply)
+        .catch(() => {})
+    }, 8000)
+    return () => {
+      alive = false
+      clearInterval(poll)
+    }
+  }, [])
+
+  // Live update when Firestore listener fires (admin just saved)
+  useEffect(() => {
+    if (!fanCardSettings) return
+    const src = fanCardSettings.tiers || {}
+    setAdminTiers({
+      regular: {
+        enabled: src.regular?.enabled !== false,
+        price: adminPriceToDollars(src.regular?.price ?? fanCardSettings.price, 50),
+        label: src.regular?.label || 'Regular Fan',
+      },
+      gold: {
+        enabled: src.gold?.enabled !== false,
+        price: adminPriceToDollars(src.gold?.price, 150),
+        label: src.gold?.label || 'Gold Fan',
+      },
+      diamond: {
+        enabled: src.diamond?.enabled !== false,
+        price: adminPriceToDollars(src.diamond?.price, 500),
+        label: src.diamond?.label || 'Diamond Fan',
+      },
+    })
+    setAdminMeta({
+      logoUrl: fanCardSettings.logoUrl,
+      footerText: fanCardSettings.footerText,
+      antiScreenshot: fanCardSettings.antiScreenshot !== false,
+    })
+  }, [fanCardSettings])
+
+  const antiScreenshot = adminMeta.antiScreenshot !== false
+  const logoUrl = adminMeta.logoUrl || fanCardSettings?.logoUrl || '/images/jvcd-avatar.jpg'
+  const footerText =
+    adminMeta.footerText ||
+    fanCardSettings?.footerText ||
+    'OFFICIAL JONATHAN ROUMIE WORLD FAN CARD'
+
+  // price is USD dollars (exact admin value)
+  const tiers: Record<FanTierId, { enabled: boolean; price: number; label: string }> =
+    adminTiers || {
+      regular: { enabled: true, price: 0, label: 'Regular Fan' },
+      gold: { enabled: true, price: 0, label: 'Gold Fan' },
+      diamond: { enabled: true, price: 0, label: 'Diamond Fan' },
+    }
 
   useEffect(() => {
+    if (!adminTiers) return
     if (!tiers[selectedTier].enabled) {
       const first = (['regular', 'gold', 'diamond'] as FanTierId[]).find((id) => tiers[id].enabled)
       if (first) setSelectedTier(first)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fanCardSettings])
+  }, [adminTiers])
 
   const activeStyle = TIER_STYLE[selectedTier]
-  const activePrice = tiers[selectedTier].price
+  const activePrice = tiers[selectedTier].price // dollars
   const showUnverifiedWatermark = !canDownload || !exportClean
 
   const memberId = `JR-${Math.abs(
@@ -860,8 +941,11 @@ export default function FanCardPage() {
         <div className="px-4 max-w-7xl mx-auto">
           {(pageState === 'apply' || pageState === 'whitelisted') && (
             <div className="max-w-2xl mx-auto mb-8 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {!adminTiers && (
+                <p className="col-span-full text-center text-gray-500 text-sm py-4">Loading admin prices…</p>
+              )}
               {(['regular', 'gold', 'diamond'] as FanTierId[]).map((id) => {
-                if (!tiers[id].enabled) return null
+                if (!adminTiers || !tiers[id].enabled) return null
                 const selected = selectedTier === id
                 const style = TIER_STYLE[id]
                 return (
@@ -876,7 +960,7 @@ export default function FanCardPage() {
                     <p className="text-[10px] tracking-widest text-white/50 mb-1">{style.badge}</p>
                     <p className="text-white font-bold text-sm">{tiers[id].label}</p>
                     <p className="text-lg font-black mt-2" style={{ color: style.accent }}>
-                      ${(tiers[id].price / 100).toFixed(2)}
+                      ${tiers[id].price.toFixed(2)}
                     </p>
                   </button>
                 )
@@ -991,7 +1075,7 @@ export default function FanCardPage() {
                   Step up to <span className="text-white font-semibold">{tiers[nextUpgrade].label}</span>
                 </p>
                 <p className="text-xl font-black" style={{ color: TIER_STYLE[nextUpgrade].accent }}>
-                  ${(tiers[nextUpgrade].price / 100).toFixed(2)}
+                  ${tiers[nextUpgrade].price.toFixed(2)}
                 </p>
                 <button
                   type="button"
