@@ -85,7 +85,7 @@ export default function ImageUpload({
             {uploading ? 'Uploading…' : value ? 'Replace image' : 'Upload image'}
           </button>
           <p className="text-gray-500 text-xs">
-            JPG, PNG, WebP · max 8MB. Saved on this server under /uploads (no Firebase Storage).
+            JPG, PNG, WebP · max 8MB. Saved under /uploads on this server (no Firebase Storage).
           </p>
           {error && <p className="text-red-400 text-xs">{error}</p>}
 
