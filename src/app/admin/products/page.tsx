@@ -1,4 +1,4 @@
-use client'
+'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAdminAuth } from '@/components/admin/AdminAuthProvider'
@@ -252,23 +252,36 @@ export default function AdminProductsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="text-gray-400 text-xs tracking-widest block mb-2">PRICE (USD)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 text-white px-4 py-2.5 rounded-lg text-sm focus:outline-none focus:border-red-500"
-                  required
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="29.99"
+                    value={formData.price}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v !== '' && !/^\d*\.?\d{0,2}$/.test(v)) return
+                      setFormData({ ...formData, price: v })
+                    }}
+                    className="w-full bg-white/5 border border-white/10 text-white pl-7 pr-4 py-2.5 rounded-lg text-sm focus:outline-none focus:border-red-500 [appearance:textfield]"
+                    required
+                  />
+                </div>
               </div>
               <div>
                 <label className="text-gray-400 text-xs tracking-widest block mb-2">STOCK</label>
                 <input
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
                   value={formData.stock}
-                  onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (v !== '' && !/^\d*$/.test(v)) return
+                    setFormData({ ...formData, stock: v })
+                  }}
                   className="w-full bg-white/5 border border-white/10 text-white px-4 py-2.5 rounded-lg text-sm focus:outline-none focus:border-red-500"
                 />
               </div>
