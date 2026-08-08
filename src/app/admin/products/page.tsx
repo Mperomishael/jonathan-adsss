@@ -1,10 +1,11 @@
-'use client'
+use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAdminAuth } from '@/components/admin/AdminAuthProvider'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Plus, Edit2, Trash2, Loader2, AlertCircle, X, Save } from 'lucide-react'
+import ImageUpload from '@/components/admin/ImageUpload'
 
 interface Product {
   id: string
@@ -286,19 +287,12 @@ export default function AdminProductsPage() {
               </div>
             </div>
 
-            <div>
-              <label className="text-gray-400 text-xs tracking-widest block mb-2">IMAGE URL</label>
-              <input
-                type="text"
-                value={formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                placeholder="/images/shop/your-image.jpeg or https://..."
-                className="w-full bg-white/5 border border-white/10 text-white px-4 py-2.5 rounded-lg text-sm focus:outline-none focus:border-red-500"
-              />
-              {formData.image && (
-                <img src={formData.image} alt="Preview" className="mt-3 h-24 object-cover rounded-lg border border-white/10" />
-              )}
-            </div>
+            <ImageUpload
+              label="PRODUCT IMAGE"
+              folder="products"
+              value={formData.image}
+              onChange={(url) => setFormData({ ...formData, image: url })}
+            />
 
             <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
               <input
