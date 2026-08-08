@@ -3,8 +3,8 @@
 type Folder = 'products' | 'gallery' | 'fan-card' | 'catalog' | 'content'
 
 /**
- * Upload an image via the site's own API (saves under public/uploads/...).
- * No Firebase Storage required.
+ * Upload via site API → public/uploads/{folder}/
+ * No Firebase Storage.
  */
 export async function uploadImage(
   file: File,
