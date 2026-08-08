@@ -118,7 +118,7 @@ export default function AdminSettingsPage() {
           </div>
 
           <div>
-            <label className="text-gray-400 text-xs tracking-widest block mb-2">WHATSAPP / CHAT NUMBER</label>
+            <label className="text-gray-400 text-xs tracking-widest block mb-2">AGENT WHATSAPP NUMBER (CHAT SUPPORT)</label>
             <input
               type="text"
               value={settings.whatsappNumber || ''}
