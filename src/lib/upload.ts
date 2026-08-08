@@ -1,37 +1,43 @@
 'use client'
 
-import { storage } from '@/lib/firebase'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+type Folder = 'products' | 'gallery' | 'fan-card' | 'catalog' | 'content'
 
 /**
- * Upload an image file to Firebase Storage and return its public download URL.
- * Path: uploads/{folder}/{timestamp}-{safeName}
+ * Upload an image via the site's own API (saves under public/uploads/...).
+ * No Firebase Storage required.
  */
 export async function uploadImage(
   file: File,
-  folder: 'products' | 'gallery' | 'fan-card' | 'catalog' | 'content' = 'products'
+  folder: Folder = 'products',
+  authToken?: string | null
 ): Promise<string> {
-  if (!storage) {
-    throw new Error('Firebase Storage is not initialized. Check NEXT_PUBLIC_FIREBASE_* env vars.')
-  }
-
   if (!file.type.startsWith('image/')) {
     throw new Error('Only image files are allowed')
   }
-
-  // ~8MB limit
   if (file.size > 8 * 1024 * 1024) {
     throw new Error('Image must be under 8MB')
   }
 
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)
-  const path = `uploads/${folder}/${Date.now()}-${safeName}`
-  const storageRef = ref(storage, path)
+  const token =
+    authToken ||
+    (typeof window !== 'undefined' ? localStorage.getItem('adminSessionToken') : null)
 
-  await uploadBytes(storageRef, file, {
-    contentType: file.type,
-    cacheControl: 'public,max-age=31536000',
+  const form = new FormData()
+  form.append('file', file)
+  form.append('folder', folder)
+
+  const res = await fetch('/api/admin/upload', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
   })
 
-  return getDownloadURL(storageRef)
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data.error || `Upload failed (${res.status})`)
+  }
+  if (!data.url) {
+    throw new Error('Upload succeeded but no URL returned')
+  }
+  return data.url as string
 }
