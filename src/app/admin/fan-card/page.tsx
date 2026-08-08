@@ -9,13 +9,21 @@ import type { FanCardSettings, FanTierId } from '@/lib/firestore'
 import ImageUpload from '@/components/admin/ImageUpload'
 
 const DEFAULT_TIERS = {
-  regular: { enabled: true, price: 5000, label: 'Regular Fan' },
-  gold: { enabled: true, price: 15000, label: 'Gold Fan' },
-  diamond: { enabled: true, price: 50000, label: 'Diamond Fan' },
+  regular: { enabled: true, price: 50, label: 'Regular Fan' },
+  gold: { enabled: true, price: 150, label: 'Gold Fan' },
+  diamond: { enabled: true, price: 500, label: 'Diamond Fan' },
+}
+
+/** Convert legacy cents or dollars → dollars for display/edit */
+function toDollars(raw: unknown, fallback: number): number {
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return fallback
+  if (Number.isInteger(n) && n >= 100) return Math.round(n) / 100
+  return Math.round(n * 100) / 100
 }
 
 const DEFAULTS: FanCardSettings = {
-  price: 5000,
+  price: 50,
   background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)',
   accentColor: '#FF0000',
   logoUrl: '/images/jvcd-avatar.jpg',
@@ -81,13 +89,13 @@ export default function AdminFanCardPage() {
 
   useEffect(() => {
     if (!firestoreSettings) return
-    const r = firestoreSettings.tiers?.regular?.price ?? firestoreSettings.price ?? DEFAULT_TIERS.regular.price
-    const g = firestoreSettings.tiers?.gold?.price ?? DEFAULT_TIERS.gold.price
-    const d = firestoreSettings.tiers?.diamond?.price ?? DEFAULT_TIERS.diamond.price
+    const r = toDollars(firestoreSettings.tiers?.regular?.price ?? firestoreSettings.price, 50)
+    const g = toDollars(firestoreSettings.tiers?.gold?.price, 150)
+    const d = toDollars(firestoreSettings.tiers?.diamond?.price, 500)
     setPriceInputs({
-      regular: (Number(r) / 100).toFixed(2),
-      gold: (Number(g) / 100).toFixed(2),
-      diamond: (Number(d) / 100).toFixed(2),
+      regular: r.toFixed(2),
+      gold: g.toFixed(2),
+      diamond: d.toFixed(2),
     })
   }, [firestoreSettings])
 
@@ -115,47 +123,45 @@ export default function AdminFanCardPage() {
     setPriceInputs((prev) => ({ ...prev, [id]: raw }))
     const d = parseFloat(raw)
     if (Number.isFinite(d) && d >= 0) {
-      updateTier(id, { price: Math.round(d * 100) })
+      updateTier(id, { price: Math.round(d * 100) / 100 })
     }
   }
 
   const onPriceBlur = (id: FanTierId) => {
     const d = parseFloat(priceInputs[id])
-    const cents = Number.isFinite(d) && d >= 0.99 ? Math.round(d * 100) : DEFAULT_TIERS[id].price
-    updateTier(id, { price: cents })
-    setPriceInputs((prev) => ({ ...prev, [id]: (cents / 100).toFixed(2) }))
+    const dollars = Number.isFinite(d) && d >= 0.99 ? Math.round(d * 100) / 100 : DEFAULT_TIERS[id].price
+    updateTier(id, { price: dollars })
+    setPriceInputs((prev) => ({ ...prev, [id]: dollars.toFixed(2) }))
   }
 
   const handleSave = async () => {
     setLocalError(null)
     setSaving(true)
     try {
-      const parseCents = (id: FanTierId, fallback: number) => {
+      const parseDollars = (id: FanTierId, fallback: number) => {
         const typed = parseFloat(priceInputs[id])
-        if (Number.isFinite(typed) && typed >= 0.99) return Math.round(typed * 100)
-        const fromSettings = Number(settings.tiers?.[id]?.price)
-        if (Number.isFinite(fromSettings) && fromSettings >= 99) return Math.round(fromSettings)
-        return fallback
+        if (Number.isFinite(typed) && typed >= 0.99) return Math.round(typed * 100) / 100
+        return toDollars(settings.tiers?.[id]?.price, fallback)
       }
       const tiers = {
         regular: {
           enabled: settings.tiers?.regular?.enabled !== false,
-          price: parseCents('regular', 5000),
+          price: parseDollars('regular', 50),
           label: settings.tiers?.regular?.label || 'Regular Fan',
         },
         gold: {
           enabled: settings.tiers?.gold?.enabled !== false,
-          price: parseCents('gold', 15000),
+          price: parseDollars('gold', 150),
           label: settings.tiers?.gold?.label || 'Gold Fan',
         },
         diamond: {
           enabled: settings.tiers?.diamond?.enabled !== false,
-          price: parseCents('diamond', 50000),
+          price: parseDollars('diamond', 500),
           label: settings.tiers?.diamond?.label || 'Diamond Fan',
         },
       }
 
-      if (tiers.regular.price < 99 || tiers.gold.price < 99 || tiers.diamond.price < 99) {
+      if (tiers.regular.price < 0.99 || tiers.gold.price < 0.99 || tiers.diamond.price < 0.99) {
         setLocalError('Each tier price must be at least $0.99')
         setSaving(false)
         return
@@ -208,7 +214,7 @@ export default function AdminFanCardPage() {
   }
 
   const meta = TIER_META[previewTier]
-  const tierPrice = ((settings.tiers?.[previewTier]?.price ?? 0) / 100).toFixed(2)
+  const tierPrice = toDollars(settings.tiers?.[previewTier]?.price ?? priceInputs[previewTier], 0).toFixed(2)
 
   return (
     <div className="max-w-3xl">
