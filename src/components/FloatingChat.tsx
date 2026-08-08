@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { MessageCircle, X, Send } from 'lucide-react'
+import { MessageCircle, X, Send, ExternalLink } from 'lucide-react'
 
 interface ChatMsg {
   id: string
@@ -19,11 +19,28 @@ export default function FloatingChat() {
   const [threadId, setThreadId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [sending, setSending] = useState(false)
+  const [whatsappNumber, setWhatsappNumber] = useState('')
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     setThreadId(localStorage.getItem(THREAD_KEY))
+  }, [])
+
+  // Load WhatsApp / chat number from site settings (admin-controlled)
+  useEffect(() => {
+    let alive = true
+    fetch('/api/settings/site')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!alive || !data) return
+        const n = String(data.whatsappNumber || '').replace(/\D/g, '')
+        setWhatsappNumber(n)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
   }, [])
 
   useEffect(() => {
@@ -35,7 +52,9 @@ export default function FloatingChat() {
         if (!res.ok) return
         const data = await res.json()
         if (alive) setMessages(data.messages || [])
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     load()
     const t = setInterval(load, 4000)
@@ -48,6 +67,14 @@ export default function FloatingChat() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, open])
+
+  const openWhatsApp = () => {
+    if (!whatsappNumber) return
+    const msg = encodeURIComponent(
+      text.trim() || 'Hi, I have a question about Jonathan Roumie World.'
+    )
+    window.open(`https://wa.me/${whatsappNumber}?text=${msg}`, '_blank', 'noopener,noreferrer')
+  }
 
   const send = async () => {
     const msg = text.trim()
@@ -71,7 +98,6 @@ export default function FloatingChat() {
         setThreadId(data.threadId)
         localStorage.setItem(THREAD_KEY, data.threadId)
       }
-      // optimistic + refresh
       const r2 = await fetch(`/api/chat?threadId=${data.threadId}`)
       if (r2.ok) {
         const d2 = await r2.json()
@@ -112,7 +138,9 @@ export default function FloatingChat() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-white font-semibold text-sm">Management</p>
-                <p className="text-emerald-100/80 text-xs">Typically replies soon</p>
+                <p className="text-emerald-100/80 text-xs">
+                  {whatsappNumber ? `WhatsApp · +${whatsappNumber}` : 'Typically replies soon'}
+                </p>
               </div>
               <button type="button" onClick={() => setOpen(false)} className="text-white/90 p-1">
                 <X size={20} />
@@ -130,6 +158,7 @@ export default function FloatingChat() {
               {messages.length === 0 && (
                 <p className="text-center text-white/40 text-xs py-8 px-4">
                   Message our team — we&apos;ll reply here.
+                  {whatsappNumber ? ' You can also continue on WhatsApp.' : ''}
                 </p>
               )}
               {messages.map((m) => (
@@ -146,13 +175,31 @@ export default function FloatingChat() {
                   >
                     {m.text}
                     <p className="text-[10px] text-white/40 mt-1 text-right">
-                      {m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      {m.createdAt
+                        ? new Date(m.createdAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : ''}
                     </p>
                   </div>
                 </div>
               ))}
               <div ref={endRef} />
             </div>
+
+            {whatsappNumber && (
+              <div className="px-3 pt-2 bg-[#1f2c34]">
+                <button
+                  type="button"
+                  onClick={openWhatsApp}
+                  className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-[#25D366] border border-[#25D366]/40 rounded-lg py-2 hover:bg-[#25D366]/10"
+                >
+                  <ExternalLink size={14} />
+                  Open WhatsApp chat
+                </button>
+              </div>
+            )}
 
             <div className="p-2 bg-[#1f2c34] flex gap-2 items-end">
               <textarea
