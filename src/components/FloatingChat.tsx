@@ -33,7 +33,7 @@ export default function FloatingChat() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!alive || !data) return
-        setWhatsappNumber(String(data.whatsappNumber || '').replace(/\\D/g, ''))
+        setWhatsappNumber(String(data.whatsappNumber || '').replace(/\D/g, ''))
       })
       .catch(() => {})
     return () => {
