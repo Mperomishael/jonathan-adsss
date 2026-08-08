@@ -3,7 +3,6 @@
 import { useRef, useState } from 'react'
 import { Upload, Loader2, X, ImageIcon } from 'lucide-react'
 import { uploadImage } from '@/lib/upload'
-import { useAdminAuth } from '@/components/admin/AdminAuthProvider'
 
 type Folder = 'products' | 'gallery' | 'fan-card' | 'catalog' | 'content'
 
@@ -25,15 +24,13 @@ export default function ImageUpload({
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
-  const { getToken } = useAdminAuth()
 
   const handleFile = async (file: File | null | undefined) => {
     if (!file) return
     setError('')
     setUploading(true)
     try {
-      const token = await getToken()
-      const url = await uploadImage(file, folder, token)
+      const url = await uploadImage(file, folder)
       onChange(url)
     } catch (e: any) {
       setError(e?.message || 'Upload failed')
@@ -42,6 +39,8 @@ export default function ImageUpload({
       if (inputRef.current) inputRef.current.value = ''
     }
   }
+
+  const isData = value?.startsWith('data:')
 
   return (
     <div className={className}>
@@ -82,20 +81,24 @@ export default function ImageUpload({
             className="flex items-center gap-2 bg-white/10 hover:bg-white/15 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-sm font-bold"
           >
             {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-            {uploading ? 'Uploading…' : value ? 'Replace image' : 'Upload image'}
+            {uploading ? 'Processing…' : value ? 'Replace image' : 'Upload image'}
           </button>
           <p className="text-gray-500 text-xs">
-            JPG, PNG, WebP · max 8MB. Saved under /uploads on this server (no Firebase Storage).
+            JPG/PNG/WebP · max 1.5MB. Saved with the product in the database (works on Vercel).
+            {isData ? ' · Embedded image ready — click Save on the form.' : ''}
           </p>
           {error && <p className="text-red-400 text-xs">{error}</p>}
 
           <input
             type="text"
-            value={value}
+            value={isData ? '' : value}
             onChange={(e) => onChange(e.target.value)}
             placeholder="Or paste /images/... or https://..."
             className="w-full bg-white/5 border border-white/10 text-white px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-red-500"
           />
+          {isData && (
+            <p className="text-green-400/80 text-xs">Embedded image loaded. Save the form to apply.</p>
+          )}
         </div>
       </div>
     </div>
