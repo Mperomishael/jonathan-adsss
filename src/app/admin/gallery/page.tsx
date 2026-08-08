@@ -6,6 +6,7 @@ import { Plus, Trash2, X, Check, ImageIcon } from 'lucide-react'
 import Image from 'next/image'
 import { useAdminAuth } from '@/components/admin/AdminAuthProvider'
 import type { GalleryImage } from '@/lib/firestore'
+import ImageUpload from '@/components/admin/ImageUpload'
 
 const CATS = ['Events', 'Art', 'Training', 'Fans', 'Media', 'Collectibles', 'Other']
 
@@ -97,19 +98,13 @@ export default function AdminGalleryPage() {
                 <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-white"><X size={20} /></button>
               </div>
 
-              {/* Preview */}
-              {form.src && (
-                <div className="relative aspect-video mb-4 rounded-xl overflow-hidden bg-white/5">
-                  <Image src={form.src} alt="preview" fill className="object-cover" onError={() => {}} />
-                </div>
-              )}
-
               <div className="space-y-4">
-                <div>
-                  <label className="text-gray-400 text-xs tracking-widest block mb-1">IMAGE URL OR PATH</label>
-                  <input type="text" placeholder="/images/gallery/..." value={form.src} onChange={(e) => setForm({ ...form, src: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 text-white px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:border-red-500 transition-colors" />
-                </div>
+                <ImageUpload
+                  label="GALLERY IMAGE"
+                  folder="gallery"
+                  value={form.src}
+                  onChange={(url) => setForm({ ...form, src: url })}
+                />
                 <div>
                   <label className="text-gray-400 text-xs tracking-widest block mb-1">ALT TEXT</label>
                   <input type="text" value={form.alt} onChange={(e) => setForm({ ...form, alt: e.target.value })}
