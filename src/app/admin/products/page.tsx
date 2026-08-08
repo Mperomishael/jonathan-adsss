@@ -18,6 +18,23 @@ interface Product {
   inStock?: boolean
 }
 
+
+const DEFAULT_SHOP_PRODUCTS = [
+  { name: 'Premium T-Shirt Black', price: 29.99, stock: 45, description: 'Exclusive Jonathan Roumie Collection', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.27.jpeg', category: 'apparel' },
+  { name: 'Premium T-Shirt White', price: 29.99, stock: 38, description: 'Classic Design', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.27_(1).jpeg', category: 'apparel' },
+  { name: 'Signature Hoodie', price: 59.99, stock: 22, description: 'Comfortable & Premium Quality', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.28.jpeg', category: 'apparel' },
+  { name: 'Signature Hoodie Alt', price: 59.99, stock: 19, description: 'Limited Edition', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.28_(1).jpeg', category: 'apparel' },
+  { name: 'Exclusive Apparel', price: 34.99, stock: 51, description: 'Fan Favorite', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.29.jpeg', category: 'merchandise' },
+  { name: 'Premium Collection Item', price: 44.99, stock: 28, description: "Collector's Edition", image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.29_(1).jpeg', category: 'merchandise' },
+  { name: 'Signature Series', price: 39.99, stock: 35, description: 'Official Merchandise', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.29_(2).jpeg', category: 'merchandise' },
+  { name: 'Limited Apparel', price: 54.99, stock: 14, description: 'Rare & Exclusive', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.29_(3).jpeg', category: 'apparel' },
+  { name: 'Classic Design Tee', price: 26.99, stock: 62, description: 'Best Seller', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.29_(4).jpeg', category: 'apparel' },
+  { name: 'Performance Hoodie', price: 64.99, stock: 17, description: 'Premium Comfort', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.30.jpeg', category: 'apparel' },
+  { name: 'Exclusive Tee', price: 31.99, stock: 40, description: 'Limited Availability', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.30_(1).jpeg', category: 'apparel' },
+  { name: 'Premium Edition', price: 49.99, stock: 23, description: 'VIP Collection', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.30_(2).jpeg', category: 'merchandise' },
+  { name: 'Signature Hoodie Premium', price: 69.99, stock: 12, description: 'Luxury Line', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.30_(3).jpeg', category: 'apparel' },
+]
+
 const emptyForm = {
   name: '',
   description: '',
@@ -57,13 +74,41 @@ export default function AdminProductsPage() {
   const loadProducts = useCallback(async () => {
     try {
       const h = await authHeaders()
-      // Prefer admin route (auth); fall back to public
       let res = await fetch('/api/admin/products', { headers: h })
       if (!res.ok) res = await fetch('/api/products')
+      let data: Product[] = []
       if (res.ok) {
-        const data = await res.json()
-        setProducts(Array.isArray(data) ? data : [])
+        const json = await res.json()
+        data = Array.isArray(json) ? json : []
       }
+
+      // If Firestore has no products yet, seed the former shop catalog so you can edit them
+      if (data.length === 0) {
+        setError('')
+        for (const item of DEFAULT_SHOP_PRODUCTS) {
+          const createRes = await fetch('/api/admin/products', {
+            method: 'POST',
+            headers: h,
+            body: JSON.stringify({
+              ...item,
+              inStock: true,
+            }),
+          })
+          if (!createRes.ok) break
+        }
+        res = await fetch('/api/admin/products', { headers: h })
+        if (!res.ok) res = await fetch('/api/products')
+        if (res.ok) {
+          const json = await res.json()
+          data = Array.isArray(json) ? json : []
+        }
+        if (data.length > 0) {
+          setSuccess('Loaded former shop products into the database — you can edit them now.')
+          setTimeout(() => setSuccess(''), 4000)
+        }
+      }
+
+      setProducts(data)
     } catch {
       setError('Failed to load products')
     } finally {
