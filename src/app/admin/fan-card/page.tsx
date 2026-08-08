@@ -6,6 +6,7 @@ import { Save, Loader2, AlertCircle, Check } from 'lucide-react'
 import { useFirestoreListener } from '@/hooks/useFirestoreListener'
 import { useAdminAuth } from '@/components/admin/AdminAuthProvider'
 import type { FanCardSettings, FanTierId } from '@/lib/firestore'
+import ImageUpload from '@/components/admin/ImageUpload'
 
 const DEFAULT_TIERS = {
   regular: { enabled: true, price: 5000, label: 'Regular Fan' },
@@ -307,15 +308,12 @@ export default function AdminFanCardPage() {
             className="w-full bg-white/5 border border-white/10 text-white px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:border-red-500"
           />
         </div>
-        <div>
-          <label className="text-gray-400 text-xs tracking-widest block mb-2">LOGO IMAGE URL</label>
-          <input
-            type="text"
-            value={settings.logoUrl}
-            onChange={(e) => setSettings({ ...settings, logoUrl: e.target.value })}
-            className="w-full bg-white/5 border border-white/10 text-white px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:border-red-500"
-          />
-        </div>
+        <ImageUpload
+          label="LOGO IMAGE"
+          folder="fan-card"
+          value={settings.logoUrl}
+          onChange={(url) => setSettings({ ...settings, logoUrl: url })}
+        />
         <label className="flex items-center gap-3 cursor-pointer bg-white/5 border border-white/10 rounded-lg p-4">
           <input
             type="checkbox"
