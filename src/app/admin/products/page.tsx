@@ -18,7 +18,6 @@ interface Product {
   inStock?: boolean
 }
 
-
 const DEFAULT_SHOP_PRODUCTS = [
   { name: 'Premium T-Shirt Black', price: 29.99, stock: 45, description: 'Exclusive Jonathan Roumie Collection', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.27.jpeg', category: 'apparel' },
   { name: 'Premium T-Shirt White', price: 29.99, stock: 38, description: 'Classic Design', image: '/images/shop/WhatsApp_Image_2026-04-23_at_19.13.27_(1).jpeg', category: 'apparel' },
@@ -82,17 +81,12 @@ export default function AdminProductsPage() {
         data = Array.isArray(json) ? json : []
       }
 
-      // If Firestore has no products yet, seed the former shop catalog so you can edit them
       if (data.length === 0) {
-        setError('')
         for (const item of DEFAULT_SHOP_PRODUCTS) {
           const createRes = await fetch('/api/admin/products', {
             method: 'POST',
             headers: h,
-            body: JSON.stringify({
-              ...item,
-              inStock: true,
-            }),
+            body: JSON.stringify({ ...item, inStock: true }),
           })
           if (!createRes.ok) break
         }
@@ -103,7 +97,7 @@ export default function AdminProductsPage() {
           data = Array.isArray(json) ? json : []
         }
         if (data.length > 0) {
-          setSuccess('Loaded former shop products into the database — you can edit them now.')
+          setSuccess('Loaded former shop products — you can edit prices and images now.')
           setTimeout(() => setSuccess(''), 4000)
         }
       }
@@ -392,6 +386,7 @@ export default function AdminProductsPage() {
             className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden"
           >
             <div className="h-40 bg-black/40 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
             </div>
             <div className="p-4 space-y-3">
@@ -424,8 +419,8 @@ export default function AdminProductsPage() {
         ))}
       </div>
 
-      {products.length === 0 && !showForm && (
-        <p className="text-center text-gray-500 py-16">No products yet. Add your first product.</p>
+      {products.length === 0 && (
+        <p className="text-gray-500 text-sm text-center py-12">No products yet. Click ADD PRODUCT.</p>
       )}
     </div>
   )
