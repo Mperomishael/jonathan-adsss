@@ -131,20 +131,27 @@ export default function AdminFanCardPage() {
     setLocalError(null)
     setSaving(true)
     try {
+      const parseCents = (id: FanTierId, fallback: number) => {
+        const typed = parseFloat(priceInputs[id])
+        if (Number.isFinite(typed) && typed >= 0.99) return Math.round(typed * 100)
+        const fromSettings = Number(settings.tiers?.[id]?.price)
+        if (Number.isFinite(fromSettings) && fromSettings >= 99) return Math.round(fromSettings)
+        return fallback
+      }
       const tiers = {
         regular: {
           enabled: settings.tiers?.regular?.enabled !== false,
-          price: Math.round(Number(settings.tiers?.regular?.price ?? 5000)),
+          price: parseCents('regular', 5000),
           label: settings.tiers?.regular?.label || 'Regular Fan',
         },
         gold: {
           enabled: settings.tiers?.gold?.enabled !== false,
-          price: Math.round(Number(settings.tiers?.gold?.price ?? 15000)),
+          price: parseCents('gold', 15000),
           label: settings.tiers?.gold?.label || 'Gold Fan',
         },
         diamond: {
           enabled: settings.tiers?.diamond?.enabled !== false,
-          price: Math.round(Number(settings.tiers?.diamond?.price ?? 50000)),
+          price: parseCents('diamond', 50000),
           label: settings.tiers?.diamond?.label || 'Diamond Fan',
         },
       }
