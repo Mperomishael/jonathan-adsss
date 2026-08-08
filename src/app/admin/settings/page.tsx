@@ -116,6 +116,20 @@ export default function AdminSettingsPage() {
               onChange={(e) => setSettings({ ...settings, contactEmail: e.target.value })}
               className="w-full bg-white/5 border border-white/10 text-white px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:border-red-500 transition-colors" />
           </div>
+
+          <div>
+            <label className="text-gray-400 text-xs tracking-widest block mb-2">WHATSAPP / CHAT NUMBER</label>
+            <input
+              type="text"
+              value={settings.whatsappNumber || ''}
+              onChange={(e) => setSettings({ ...settings, whatsappNumber: e.target.value })}
+              placeholder="e.g. 15551234567 (country code, no + or spaces)"
+              className="w-full bg-white/5 border border-white/10 text-white px-3 py-2.5 rounded-lg text-sm focus:outline-none focus:border-red-500 transition-colors"
+            />
+            <p className="text-gray-500 text-xs mt-1">
+              Used by the floating chat button. Digits only with country code (e.g. 2348012345678). Leave empty to keep in-app chat only.
+            </p>
+          </div>
         </section>
 
           {/* Payment Methods */}
