@@ -73,7 +73,6 @@ export default function AdminFanCardPage() {
     })
   }, [firestoreSettings])
 
-  // Free-typing price strings (dollars) so inputs don't behave like spinners
   const [priceInputs, setPriceInputs] = useState<Record<FanTierId, string>>({
     regular: '50.00',
     gold: '150.00',
@@ -287,7 +286,6 @@ export default function AdminFanCardPage() {
         <h2 className="text-white text-sm font-black tracking-widest">MEMBERSHIP TIERS</h2>
         {(['regular', 'gold', 'diamond'] as FanTierId[]).map((id) => {
           const t = settings.tiers?.[id] || DEFAULT_TIERS[id]
-          const dollars = (Number(t.price) / 100).toFixed(2)
           return (
             <div key={id} className="bg-white/5 border border-white/10 rounded-xl p-5 space-y-3">
               <div className="flex items-center justify-between gap-3 flex-wrap">
