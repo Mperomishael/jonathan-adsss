@@ -68,7 +68,7 @@ export default function CheckoutPage() {
         if (priceRes.ok) {
           const priceData = await priceRes.json()
           if (typeof priceData.price === 'number') {
-            setFanCardPrice(Number((priceData.price / 100).toFixed(2)))
+            setFanCardPrice(Number(priceData.price.toFixed(2)))
           }
         }
       } catch (err) {
