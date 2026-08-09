@@ -4,8 +4,8 @@
  *
  * Price conventions:
  * - Product.price           → DOLLARS (e.g. 29.99)
- * - FanCardSettings.price  → CENTS (e.g. 5000 = $50.00)
- * - FanCardSettings.tiers.*.price → CENTS
+ * - FanCardSettings.price / tiers.*.price → DOLLARS (e.g. 49.99)
+ *   No hardcoded prices — only values saved from Admin are used.
  */
 import { adminDb } from './firebase-admin'
 
@@ -36,13 +36,13 @@ export interface GalleryImage {
 export type FanTierId = 'regular' | 'gold' | 'diamond'
 
 export interface FanTierConfig {
-  enabled: boolean
-  price: number // cents
-  label: string
+  enabled?: boolean
+  price?: number // DOLLARS — set only via Admin
+  label?: string
 }
 
 export interface FanCardSettings {
-  price: number // CENTS — legacy / regular default
+  price?: number // DOLLARS — admin only
   background: string
   accentColor: string
   logoUrl: string
@@ -174,40 +174,71 @@ export async function deleteGalleryImage(id: string): Promise<void> {
 
 // ─── Fan Card Settings ────────────────────────────────────────────────────────
 
-const DEFAULT_TIERS: {
+/** Labels only — NO price defaults. Prices come only from Admin saves. */
+const EMPTY_TIERS: {
   regular: FanTierConfig
   gold: FanTierConfig
   diamond: FanTierConfig
 } = {
-  regular: { enabled: true, price: 5000, label: 'Regular Fan' },
-  gold: { enabled: true, price: 15000, label: 'Gold Fan' },
-  diamond: { enabled: true, price: 50000, label: 'Diamond Fan' },
+  regular: { enabled: true, label: 'Regular Fan' },
+  gold: { enabled: true, label: 'Gold Fan' },
+  diamond: { enabled: true, label: 'Diamond Fan' },
 }
 
-const DEFAULT_FAN_CARD: FanCardSettings = {
-  price: 5000, // cents = $50.00 (regular)
+const EMPTY_FAN_CARD: FanCardSettings = {
   background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)',
   accentColor: '#FF0000',
   logoUrl: '/images/jvcd-avatar.jpg',
   footerText: 'OFFICIAL JONATHAN ROUMIE WORLD FAN CARD',
   antiScreenshot: true,
-  tiers: DEFAULT_TIERS,
+  tiers: EMPTY_TIERS,
+}
+
+/** Coerce stored value to dollars. Never invent a price. */
+function asDollars(raw: unknown): number | undefined {
+  if (raw === null || raw === undefined || raw === '') return undefined
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n < 0) return undefined
+  // Legacy cents only if clearly large integer typical of old storage (e.g. 5000)
+  // Admin now always stores dollars — prefer dollars as-is for normal ranges.
+  if (Number.isInteger(n) && n >= 1000) return Math.round(n) / 100
+  return Math.round(n * 100) / 100
 }
 
 export async function getFanCardSettings(): Promise<FanCardSettings> {
   const doc = await getDb().collection('pageSettings').doc('fanCard').get()
   if (!doc.exists) {
-    return { ...DEFAULT_FAN_CARD, tiers: { ...DEFAULT_TIERS } }
+    return { ...EMPTY_FAN_CARD, tiers: { ...EMPTY_TIERS } }
   }
   const data = doc.data() as FanCardSettings
+  const tr = data.tiers?.regular || {}
+  const tg = data.tiers?.gold || {}
+  const td = data.tiers?.diamond || {}
+  const regularPrice = asDollars(tr.price ?? data.price)
+  const goldPrice = asDollars(tg.price)
+  const diamondPrice = asDollars(td.price)
   return {
-    ...DEFAULT_FAN_CARD,
+    ...EMPTY_FAN_CARD,
     ...data,
     antiScreenshot: data.antiScreenshot !== false,
+    // Prefer dollars from admin; omit price key if never set
+    ...(regularPrice !== undefined ? { price: regularPrice } : {}),
     tiers: {
-      regular: { ...DEFAULT_TIERS.regular, ...(data.tiers?.regular || {}) },
-      gold: { ...DEFAULT_TIERS.gold, ...(data.tiers?.gold || {}) },
-      diamond: { ...DEFAULT_TIERS.diamond, ...(data.tiers?.diamond || {}) },
+      regular: {
+        enabled: tr.enabled !== false,
+        label: tr.label || 'Regular Fan',
+        ...(regularPrice !== undefined ? { price: regularPrice } : {}),
+      },
+      gold: {
+        enabled: tg.enabled !== false,
+        label: tg.label || 'Gold Fan',
+        ...(goldPrice !== undefined ? { price: goldPrice } : {}),
+      },
+      diamond: {
+        enabled: td.enabled !== false,
+        label: td.label || 'Diamond Fan',
+        ...(diamondPrice !== undefined ? { price: diamondPrice } : {}),
+      },
     },
   }
 }
