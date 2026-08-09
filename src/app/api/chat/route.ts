@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     const db = getDb()
     const now = new Date().toISOString()
     let id = threadId as string | undefined
+    const normalizedSender = sender === 'admin' ? 'admin' : sender === 'bot' ? 'bot' : 'user'
 
     if (!id) {
       const ref = await db.collection('chatThreads').add({
@@ -37,8 +38,8 @@ export async function POST(req: NextRequest) {
         createdAt: now,
         updatedAt: now,
         lastMessage: text.trim(),
-        unreadAdmin: sender === 'user' ? 1 : 0,
-        unreadUser: sender === 'admin' ? 1 : 0,
+        unreadAdmin: normalizedSender === 'user' ? 1 : 0,
+        unreadUser: normalizedSender === 'admin' ? 1 : 0,
       })
       id = ref.id
     } else {
@@ -46,9 +47,11 @@ export async function POST(req: NextRequest) {
         {
           updatedAt: now,
           lastMessage: text.trim(),
-          ...(sender === 'user'
+          ...(normalizedSender === 'user'
             ? { unreadAdmin: (await getUnread(db, id, 'unreadAdmin')) + 1 }
-            : { unreadUser: (await getUnread(db, id, 'unreadUser')) + 1 }),
+            : normalizedSender === 'admin'
+              ? { unreadUser: (await getUnread(db, id, 'unreadUser')) + 1 }
+              : {}),
         },
         { merge: true }
       )
@@ -56,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     const msgRef = await db.collection('chatThreads').doc(id).collection('messages').add({
       text: text.trim(),
-      sender: sender === 'admin' ? 'admin' : 'user',
+      sender: normalizedSender,
       createdAt: now,
     })
 
