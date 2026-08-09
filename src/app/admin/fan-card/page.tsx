@@ -9,21 +9,22 @@ import type { FanCardSettings, FanTierId } from '@/lib/firestore'
 import ImageUpload from '@/components/admin/ImageUpload'
 
 const DEFAULT_TIERS = {
-  regular: { enabled: true, price: 50, label: 'Regular Fan' },
-  gold: { enabled: true, price: 150, label: 'Gold Fan' },
-  diamond: { enabled: true, price: 500, label: 'Diamond Fan' },
+  regular: { enabled: true, label: 'Regular Fan' },
+  gold: { enabled: true, label: 'Gold Fan' },
+  diamond: { enabled: true, label: 'Diamond Fan' },
 }
 
 /** Convert legacy cents or dollars → dollars for display/edit */
-function toDollars(raw: unknown, fallback: number): number {
+function toDollars(raw: unknown): number | undefined {
+  if (raw === null || raw === undefined || raw === '') return undefined
   const n = Number(raw)
-  if (!Number.isFinite(n) || n <= 0) return fallback
-  if (Number.isInteger(n) && n >= 100) return Math.round(n) / 100
+  if (!Number.isFinite(n) || n < 0) return undefined
+  // Legacy cents only for old large integers (e.g. 5000)
+  if (Number.isInteger(n) && n >= 1000) return Math.round(n) / 100
   return Math.round(n * 100) / 100
 }
 
 const DEFAULTS: FanCardSettings = {
-  price: 50,
   background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%)',
   accentColor: '#FF0000',
   logoUrl: '/images/jvcd-avatar.jpg',
@@ -81,21 +82,22 @@ export default function AdminFanCardPage() {
     })
   }, [firestoreSettings])
 
+  // Free-typing price strings (dollars) so inputs don't behave like spinners
   const [priceInputs, setPriceInputs] = useState<Record<FanTierId, string>>({
-    regular: '50.00',
-    gold: '150.00',
-    diamond: '500.00',
+    regular: '',
+    gold: '',
+    diamond: '',
   })
 
   useEffect(() => {
     if (!firestoreSettings) return
-    const r = toDollars(firestoreSettings.tiers?.regular?.price ?? firestoreSettings.price, 50)
-    const g = toDollars(firestoreSettings.tiers?.gold?.price, 150)
-    const d = toDollars(firestoreSettings.tiers?.diamond?.price, 500)
+    const r = toDollars(firestoreSettings.tiers?.regular?.price ?? firestoreSettings.price)
+    const g = toDollars(firestoreSettings.tiers?.gold?.price)
+    const d = toDollars(firestoreSettings.tiers?.diamond?.price)
     setPriceInputs({
-      regular: r.toFixed(2),
-      gold: g.toFixed(2),
-      diamond: d.toFixed(2),
+      regular: r !== undefined ? r.toFixed(2) : '',
+      gold: g !== undefined ? g.toFixed(2) : '',
+      diamond: d !== undefined ? d.toFixed(2) : '',
     })
   }, [firestoreSettings])
 
@@ -129,7 +131,11 @@ export default function AdminFanCardPage() {
 
   const onPriceBlur = (id: FanTierId) => {
     const d = parseFloat(priceInputs[id])
-    const dollars = Number.isFinite(d) && d >= 0.99 ? Math.round(d * 100) / 100 : DEFAULT_TIERS[id].price
+    if (!Number.isFinite(d) || d < 0.99) {
+      setPriceInputs((prev) => ({ ...prev, [id]: '' }))
+      return
+    }
+    const dollars = Math.round(d * 100) / 100
     updateTier(id, { price: dollars })
     setPriceInputs((prev) => ({ ...prev, [id]: dollars.toFixed(2) }))
   }
@@ -138,33 +144,41 @@ export default function AdminFanCardPage() {
     setLocalError(null)
     setSaving(true)
     try {
-      const parseDollars = (id: FanTierId, fallback: number) => {
+      const parseDollars = (id: FanTierId) => {
         const typed = parseFloat(priceInputs[id])
         if (Number.isFinite(typed) && typed >= 0.99) return Math.round(typed * 100) / 100
-        return toDollars(settings.tiers?.[id]?.price, fallback)
+        return toDollars(settings.tiers?.[id]?.price)
+      }
+      const prices = {
+        regular: parseDollars('regular'),
+        gold: parseDollars('gold'),
+        diamond: parseDollars('diamond'),
+      }
+      if (
+        prices.regular === undefined ||
+        prices.gold === undefined ||
+        prices.diamond === undefined
+      ) {
+        setLocalError('Set a price (min $0.99) for every tier before saving')
+        setSaving(false)
+        return
       }
       const tiers = {
         regular: {
           enabled: settings.tiers?.regular?.enabled !== false,
-          price: parseDollars('regular', 50),
+          price: prices.regular,
           label: settings.tiers?.regular?.label || 'Regular Fan',
         },
         gold: {
           enabled: settings.tiers?.gold?.enabled !== false,
-          price: parseDollars('gold', 150),
+          price: prices.gold,
           label: settings.tiers?.gold?.label || 'Gold Fan',
         },
         diamond: {
           enabled: settings.tiers?.diamond?.enabled !== false,
-          price: parseDollars('diamond', 500),
+          price: prices.diamond,
           label: settings.tiers?.diamond?.label || 'Diamond Fan',
         },
-      }
-
-      if (tiers.regular.price < 0.99 || tiers.gold.price < 0.99 || tiers.diamond.price < 0.99) {
-        setLocalError('Each tier price must be at least $0.99')
-        setSaving(false)
-        return
       }
 
       const token = await getToken()
@@ -214,7 +228,8 @@ export default function AdminFanCardPage() {
   }
 
   const meta = TIER_META[previewTier]
-  const tierPrice = toDollars(settings.tiers?.[previewTier]?.price ?? priceInputs[previewTier], 0).toFixed(2)
+  const _tp = toDollars(settings.tiers?.[previewTier]?.price ?? priceInputs[previewTier])
+  const tierPrice = _tp !== undefined ? _tp.toFixed(2) : '—'
 
   return (
     <div className="max-w-3xl">
