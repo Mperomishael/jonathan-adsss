@@ -4,13 +4,14 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion'
 import {
   Download, CheckCircle, Copy, Check,
-  Bitcoin, Clock, AlertCircle, Loader2, LogIn, Mail, User as UserIcon, Truck, MapPin,
+  Bitcoin, Clock, AlertCircle, Loader2, LogIn, Mail, User as UserIcon, Truck, MapPin, Upload, X as XIcon,
 } from 'lucide-react'
 import Image from 'next/image'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import { useUserAuth } from '@/components/user/UserAuthProvider'
 import { useFirestoreListener } from '@/hooks/useFirestoreListener'
+import { uploadImage } from '@/lib/upload'
 
 type PayMethod = 'USDT' | 'BTC' | 'Venmo' | 'ChipperCash' | 'CashApp'
 type FanTierId = 'regular' | 'gold' | 'diamond'
@@ -437,6 +438,9 @@ function ApplicationForm({
   const [error, setError] = useState<string | null>(null)
   const [addWaybill, setAddWaybill] = useState(false)
   const [shippingAddress, setShippingAddress] = useState('')
+  const [proofUrl, setProofUrl] = useState('')
+  const [proofUploading, setProofUploading] = useState(false)
+  const [proofError, setProofError] = useState<string | null>(null)
 
   useEffect(() => {
     if (options.length > 0 && !options.includes(method)) setMethod(options[0])
@@ -447,6 +451,22 @@ function ApplicationForm({
   // priceCents prop is actually USD dollars from admin (kept name for minimal churn)
   const priceUsd = Number(priceCents).toFixed(2)
   const totalPrice = addWaybill ? (parseFloat(priceUsd) + waybillPrice).toFixed(2) : priceUsd
+
+  const handleProofSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file
+    if (!file) return
+    setProofError(null)
+    setProofUploading(true)
+    try {
+      const dataUrl = await uploadImage(file, 'fan-card')
+      setProofUrl(dataUrl)
+    } catch (err: any) {
+      setProofError(err?.message || 'Could not upload screenshot. Try a smaller image.')
+    } finally {
+      setProofUploading(false)
+    }
+  }
 
   const handleSubmit = async () => {
     setError(null)
@@ -460,6 +480,10 @@ function ApplicationForm({
     }
     if (addWaybill && !shippingAddress.trim()) {
       setError('Please enter your shipping address for waybill.')
+      return
+    }
+    if (!proofUrl) {
+      setError('Please upload a screenshot of your payment before submitting.')
       return
     }
 
@@ -476,6 +500,7 @@ function ApplicationForm({
           tier,
           waybill: addWaybill,
           shippingAddress: addWaybill ? shippingAddress.trim() : undefined,
+          proofUrl,
         }),
       })
       const data = await res.json()
@@ -564,6 +589,66 @@ function ApplicationForm({
 
       <div>
         <label className="flex items-center gap-2 text-gray-400 text-xs tracking-widest uppercase mb-2">
+          <Upload size={12} /> Payment Screenshot
+        </label>
+        <label className="block cursor-pointer">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleProofSelect}
+            disabled={proofUploading}
+            className="hidden"
+          />
+          <div
+            className={`border-2 border-dashed rounded-xl p-5 text-center transition-all ${
+              proofUrl
+                ? 'border-green-500/60 bg-green-900/10'
+                : 'border-white/15 hover:border-white/30 bg-white/2'
+            }`}
+          >
+            {proofUploading ? (
+              <div className="flex flex-col items-center gap-2 py-2">
+                <Loader2 size={22} className="animate-spin text-gray-400" />
+                <p className="text-gray-400 text-xs">Uploading…</p>
+              </div>
+            ) : proofUrl ? (
+              <div className="space-y-2">
+                <img
+                  src={proofUrl}
+                  alt="Payment proof preview"
+                  className="max-h-32 mx-auto rounded-lg border border-white/10 object-contain"
+                />
+                <p className="text-green-400 text-xs font-semibold flex items-center justify-center gap-1">
+                  <Check size={13} /> Screenshot attached — tap to replace
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 py-2">
+                <Upload size={22} className="text-gray-500" />
+                <p className="text-white text-sm font-semibold">Tap to upload payment screenshot</p>
+                <p className="text-gray-500 text-xs">Required · PNG or JPG, under 1.5MB</p>
+              </div>
+            )}
+          </div>
+        </label>
+        {proofUrl && !proofUploading && (
+          <button
+            type="button"
+            onClick={() => setProofUrl('')}
+            className="mt-2 flex items-center gap-1 text-gray-500 hover:text-red-400 text-xs"
+          >
+            <XIcon size={12} /> Remove screenshot
+          </button>
+        )}
+        {proofError && (
+          <p className="text-red-400 text-xs mt-2 flex items-center gap-1">
+            <AlertCircle size={12} /> {proofError}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label className="flex items-center gap-2 text-gray-400 text-xs tracking-widest uppercase mb-2">
           <UserIcon size={12} /> Name to Engrave on Card
         </label>
         <input
@@ -600,7 +685,7 @@ function ApplicationForm({
       <button
         type="button"
         onClick={handleSubmit}
-        disabled={submitting}
+        disabled={submitting || proofUploading || !proofUrl}
         className="w-full bg-jcvd-red hover:bg-red-700 text-white py-4 rounded-xl font-bold tracking-widest disabled:opacity-60 flex items-center justify-center gap-3"
       >
         {submitting ? (
@@ -1016,7 +1101,10 @@ export default function FanCardPage() {
                   <h3 className="text-2xl font-bold text-white mb-2">Payment Submitted!</h3>
                   <p className="text-green-300 mb-2">Request for <span className="font-bold">{cardName}</span></p>
                   <p className="text-white/70 text-sm mb-4">Tier: <span className="font-semibold text-white">{tiers[selectedTier].label}</span></p>
-                  <p className="text-gray-400 text-sm">Email: <span className="font-mono text-white">{submittedEmail}</span></p>
+                  <p className="text-gray-400 text-sm mb-1">Email: <span className="font-mono text-white">{submittedEmail}</span></p>
+                  <p className="text-blue-300 text-sm mt-4">
+                    Please hold on while we confirm your payment — our team reviews your screenshot and usually verifies within 24 hours.
+                  </p>
                 </div>
                 <button type="button" onClick={handleGoogleSignIn} disabled={loginLoading} className="w-full bg-jcvd-red hover:bg-red-700 text-white py-3 rounded-xl font-bold tracking-widest disabled:opacity-50 flex items-center justify-center gap-2">
                   {loginLoading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
@@ -1032,7 +1120,7 @@ export default function FanCardPage() {
                 <Clock size={48} className="text-blue-400 mx-auto" />
                 <div>
                   <h3 className="text-2xl font-bold text-white mb-2">Payment Under Review</h3>
-                  <p className="text-blue-300">Your card stays watermarked until admin confirms payment.</p>
+                  <p className="text-blue-300">Please hold on — our admin team is confirming your payment screenshot. Your card stays watermarked until it's verified.</p>
                 </div>
                 <button type="button" onClick={() => logout()} className="w-full bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold tracking-widest">
                   Sign Out
