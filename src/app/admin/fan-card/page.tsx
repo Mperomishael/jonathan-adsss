@@ -726,7 +726,7 @@ export default function FanCardPage() {
     'OFFICIAL JONATHAN ROUMIE WORLD FAN CARD'
 
   // price is USD dollars (exact admin value)
-  const tiers: Record<FanTierId, { enabled: boolean; price: number; label: string }> =
+  const tiers: Record<FanTierId, { enabled: boolean; price?: number; label: string }> =
     adminTiers || {
       regular: { enabled: true, label: 'Regular Fan' },
       gold: { enabled: true, label: 'Gold Fan' },
