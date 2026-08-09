@@ -23,6 +23,35 @@ interface AuthForm {
   name: string
 }
 
+interface RewardActivity {
+  id: string
+  type: string
+  points: number
+  description: string
+  claimedAt: string
+}
+
+interface RewardProfile {
+  totalPoints: number
+  totalRewards: number
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum'
+  rewards: RewardActivity[]
+}
+
+const TIER_THRESHOLDS: Record<RewardProfile['tier'], number> = {
+  bronze: 0,
+  silver: 500,
+  gold: 2000,
+  platinum: 5000,
+}
+const TIER_ORDER: RewardProfile['tier'][] = ['bronze', 'silver', 'gold', 'platinum']
+const TIER_BENEFIT: Record<RewardProfile['tier'], string> = {
+  bronze: '0% OFF',
+  silver: '5% OFF',
+  gold: '10% OFF',
+  platinum: '15% OFF',
+}
+
 export default function RewardsClient() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -35,6 +64,9 @@ export default function RewardsClient() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [showResetForm, setShowResetForm] = useState(false)
+  const [profile, setProfile] = useState<RewardProfile | null>(null)
+  const [profileLoading, setProfileLoading] = useState(true)
+  const [profileError, setProfileError] = useState('')
 
   // Monitor auth state
   useEffect(() => {
@@ -51,6 +83,68 @@ export default function RewardsClient() {
 
     return unsubscribe
   }, [])
+
+  // Load the real reward profile once signed in — creates one on first visit
+  useEffect(() => {
+    if (!user) {
+      setProfile(null)
+      return
+    }
+
+    let alive = true
+
+    const loadProfile = async () => {
+      setProfileLoading(true)
+      setProfileError('')
+      try {
+        const token = await user.getIdToken()
+
+        const res = await fetch('/api/user/reward-profile', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+
+        if (res.status === 404) {
+          // No profile yet for this account — initialize one
+          const createRes = await fetch('/api/user/reward-profile', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ email: user.email }),
+          })
+          if (!alive) return
+          if (createRes.ok) {
+            const created = await createRes.json()
+            setProfile(created.profile)
+          } else {
+            setProfileError('Could not initialize your reward profile.')
+          }
+          return
+        }
+
+        if (!res.ok) {
+          if (!alive) return
+          setProfileError('Could not load your reward profile.')
+          return
+        }
+
+        const data = await res.json()
+        if (!alive) return
+        setProfile(data)
+      } catch (err) {
+        console.error('Failed to load reward profile:', err)
+        if (alive) setProfileError('Could not load your reward profile.')
+      } finally {
+        if (alive) setProfileLoading(false)
+      }
+    }
+
+    loadProfile()
+    return () => {
+      alive = false
+    }
+  }, [user])
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -170,66 +264,102 @@ export default function RewardsClient() {
                 </motion.button>
               </div>
 
-              {/* Rewards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-gradient-to-br from-blue-600/20 to-blue-900/20 border border-blue-500/50 rounded-2xl p-6"
-                >
-                  <p className="text-blue-300 text-xs tracking-widest mb-2">YOUR POINTS</p>
-                  <h2 className="text-white text-4xl font-black">1,250</h2>
-                  <p className="text-gray-400 text-sm mt-4">Earn from purchases</p>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="bg-gradient-to-br from-purple-600/20 to-purple-900/20 border border-purple-500/50 rounded-2xl p-6"
-                >
-                  <p className="text-purple-300 text-xs tracking-widest mb-2">CURRENT TIER</p>
-                  <h2 className="text-white text-4xl font-black">GOLD</h2>
-                  <p className="text-gray-400 text-sm mt-4">550 to Platinum</p>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="bg-gradient-to-br from-green-600/20 to-green-900/20 border border-green-500/50 rounded-2xl p-6"
-                >
-                  <p className="text-green-300 text-xs tracking-widest mb-2">BENEFIT</p>
-                  <h2 className="text-white text-4xl font-black">10% OFF</h2>
-                  <p className="text-gray-400 text-sm mt-4">All purchases</p>
-                </motion.div>
-              </div>
-
-              {/* Activities */}
-              <div className="space-y-6">
-                <h3 className="text-white text-2xl font-black tracking-widest">RECENT ACTIVITY</h3>
-                <div className="space-y-3">
-                  {[
-                    { type: 'Purchase', points: '+100', desc: 'Premium Hoodie' },
-                    { type: 'Referral', points: '+50', desc: 'Invited friend' },
-                    { type: 'Review', points: '+25', desc: 'Product review' },
-                  ].map((activity, idx) => (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                      className="bg-white/5 border border-white/10 rounded-lg p-4 flex justify-between items-center hover:bg-white/10 transition-colors"
-                    >
-                      <div>
-                        <p className="text-white font-bold">{activity.type}</p>
-                        <p className="text-gray-400 text-sm">{activity.desc}</p>
-                      </div>
-                      <p className="text-green-400 font-bold text-lg">{activity.points}</p>
-                    </motion.div>
-                  ))}
+              {profileLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader className="text-white animate-spin" size={32} />
                 </div>
-              </div>
+              ) : profileError ? (
+                <div className="bg-red-900/30 border border-red-500/50 rounded-lg p-4 flex items-center gap-2">
+                  <AlertCircle size={20} className="text-red-400" />
+                  <p className="text-red-300 text-sm">{profileError}</p>
+                </div>
+              ) : (
+                <>
+                  {/* Rewards Grid — live data from this account's reward profile */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-gradient-to-br from-blue-600/20 to-blue-900/20 border border-blue-500/50 rounded-2xl p-6"
+                    >
+                      <p className="text-blue-300 text-xs tracking-widest mb-2">YOUR POINTS</p>
+                      <h2 className="text-white text-4xl font-black">
+                        {(profile?.totalPoints ?? 0).toLocaleString()}
+                      </h2>
+                      <p className="text-gray-400 text-sm mt-4">Earn from purchases</p>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className="bg-gradient-to-br from-purple-600/20 to-purple-900/20 border border-purple-500/50 rounded-2xl p-6"
+                    >
+                      <p className="text-purple-300 text-xs tracking-widest mb-2">CURRENT TIER</p>
+                      <h2 className="text-white text-4xl font-black">
+                        {(profile?.tier ?? 'bronze').toUpperCase()}
+                      </h2>
+                      <p className="text-gray-400 text-sm mt-4">
+                        {(() => {
+                          const tier = profile?.tier ?? 'bronze'
+                          const idx = TIER_ORDER.indexOf(tier)
+                          const nextTier = TIER_ORDER[idx + 1]
+                          if (!nextTier) return 'Max tier reached'
+                          const remaining = TIER_THRESHOLDS[nextTier] - (profile?.totalPoints ?? 0)
+                          return `${Math.max(remaining, 0).toLocaleString()} to ${nextTier[0].toUpperCase()}${nextTier.slice(1)}`
+                        })()}
+                      </p>
+                    </motion.div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.2 }}
+                      className="bg-gradient-to-br from-green-600/20 to-green-900/20 border border-green-500/50 rounded-2xl p-6"
+                    >
+                      <p className="text-green-300 text-xs tracking-widest mb-2">BENEFIT</p>
+                      <h2 className="text-white text-4xl font-black">
+                        {TIER_BENEFIT[profile?.tier ?? 'bronze']}
+                      </h2>
+                      <p className="text-gray-400 text-sm mt-4">All purchases</p>
+                    </motion.div>
+                  </div>
+
+                  {/* Activities — live from this account's claimed rewards */}
+                  <div className="space-y-6">
+                    <h3 className="text-white text-2xl font-black tracking-widest">RECENT ACTIVITY</h3>
+                    {profile?.rewards && profile.rewards.length > 0 ? (
+                      <div className="space-y-3">
+                        {[...profile.rewards]
+                          .sort((a, b) => new Date(b.claimedAt).getTime() - new Date(a.claimedAt).getTime())
+                          .map((activity, idx) => (
+                            <motion.div
+                              key={activity.id ?? idx}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: idx * 0.05 }}
+                              className="bg-white/5 border border-white/10 rounded-lg p-4 flex justify-between items-center hover:bg-white/10 transition-colors"
+                            >
+                              <div>
+                                <p className="text-white font-bold">{activity.type}</p>
+                                <p className="text-gray-400 text-sm">{activity.description}</p>
+                              </div>
+                              <p className="text-green-400 font-bold text-lg">
+                                {activity.points >= 0 ? `+${activity.points}` : activity.points}
+                              </p>
+                            </motion.div>
+                          ))}
+                      </div>
+                    ) : (
+                      <div className="bg-white/5 border border-white/10 rounded-lg p-6 text-center">
+                        <p className="text-gray-400 text-sm">
+                          No activity yet — points will appear here as you shop, refer friends, and leave reviews.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </motion.div>
           </section>
         </main>
