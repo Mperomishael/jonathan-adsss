@@ -4,45 +4,36 @@ import { getFanCardSettings } from '@/lib/firestore'
 export const dynamic = 'force-dynamic'
 
 /**
- * Public fan-card settings.
- * Prices are always returned in USD dollars (e.g. 49.99).
- * Legacy cents values (>= 100 integer) are converted once.
+ * Public fan-card settings — prices are ADMIN ONLY (USD dollars).
+ * No hardcoded tier prices. Missing price → null.
  */
-function toDollars(raw: unknown, fallback: number): number {
-  const n = Number(raw)
-  if (!Number.isFinite(n) || n <= 0) return fallback
-  // Legacy cents (5000 = $50)
-  if (Number.isInteger(n) && n >= 100) return Math.round(n) / 100
-  return Math.round(n * 100) / 100
-}
-
 export async function GET() {
   try {
     const s = await getFanCardSettings()
     const tiers = {
       regular: {
         enabled: s.tiers?.regular?.enabled !== false,
-        price: toDollars(s.tiers?.regular?.price ?? s.price, 50),
+        price: s.tiers?.regular?.price ?? s.price ?? null,
         label: s.tiers?.regular?.label || 'Regular Fan',
       },
       gold: {
         enabled: s.tiers?.gold?.enabled !== false,
-        price: toDollars(s.tiers?.gold?.price, 150),
+        price: s.tiers?.gold?.price ?? null,
         label: s.tiers?.gold?.label || 'Gold Fan',
       },
       diamond: {
         enabled: s.tiers?.diamond?.enabled !== false,
-        price: toDollars(s.tiers?.diamond?.price, 500),
+        price: s.tiers?.diamond?.price ?? null,
         label: s.tiers?.diamond?.label || 'Diamond Fan',
       },
     }
     return NextResponse.json({
       price: tiers.regular.price,
-      logoUrl: s.logoUrl,
-      footerText: s.footerText,
+      logoUrl: s.logoUrl || null,
+      footerText: s.footerText || null,
       antiScreenshot: s.antiScreenshot !== false,
-      background: s.background,
-      accentColor: s.accentColor,
+      background: s.background || null,
+      accentColor: s.accentColor || null,
       tiers,
       updatedAt: s.updatedAt || null,
     })
