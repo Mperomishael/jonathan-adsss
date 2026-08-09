@@ -3,13 +3,7 @@ import { getFanCardSettings } from '@/lib/firestore'
 
 export const dynamic = 'force-dynamic'
 
-function toDollars(raw: unknown, fallback: number): number {
-  const n = Number(raw)
-  if (!Number.isFinite(n) || n <= 0) return fallback
-  if (Number.isInteger(n) && n >= 100) return Math.round(n) / 100
-  return Math.round(n * 100) / 100
-}
-
+/** Admin-only price. No hardcoded fallbacks. */
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
@@ -18,10 +12,15 @@ export async function GET(req: Request) {
     const raw =
       s.tiers?.[tier]?.price ??
       (tier === 'regular' ? s.price : undefined)
-    const price = toDollars(
-      raw,
-      tier === 'gold' ? 150 : tier === 'diamond' ? 500 : 50
-    )
+
+    if (raw === undefined || raw === null || !Number.isFinite(Number(raw))) {
+      return NextResponse.json(
+        { error: 'Price not configured in admin', price: null, tier },
+        { status: 404 }
+      )
+    }
+
+    const price = Math.round(Number(raw) * 100) / 100
     return NextResponse.json({
       price,
       tier,
@@ -29,6 +28,9 @@ export async function GET(req: Request) {
     })
   } catch (error: any) {
     console.error('Failed to fetch fan card price:', error)
-    return NextResponse.json({ price: 50, tier: 'regular' }, { status: 200 })
+    return NextResponse.json(
+      { error: error?.message || 'Failed', price: null },
+      { status: 500 }
+    )
   }
 }
