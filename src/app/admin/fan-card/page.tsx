@@ -19,8 +19,7 @@ function toDollars(raw: unknown): number | undefined {
   if (raw === null || raw === undefined || raw === '') return undefined
   const n = Number(raw)
   if (!Number.isFinite(n) || n < 0) return undefined
-  // Legacy cents only for old large integers (e.g. 5000)
-  if (Number.isInteger(n) && n >= 1000) return Math.round(n) / 100
+  // Exact passthrough — whatever you type is what gets stored/shown, no scale conversion.
   return Math.round(n * 100) / 100
 }
 
