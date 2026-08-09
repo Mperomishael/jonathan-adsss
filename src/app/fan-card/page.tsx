@@ -79,11 +79,10 @@ const UPGRADE_NEXT: Partial<Record<FanTierId, FanTierId>> = {
   gold: 'diamond',
 }
 
-/** Admin prices are USD dollars. Legacy integer cents (>=1000) converted once. */
+/** Admin prices are USD dollars, always. No cents conversion, no thresholds — exact passthrough. */
 function adminPriceToDollars(raw: unknown, fallback: number): number {
   const n = Number(raw)
   if (!Number.isFinite(n) || n <= 0) return fallback
-  if (Number.isInteger(n) && n >= 1000) return Math.round(n) / 100
   return Math.round(n * 100) / 100
 }
 
