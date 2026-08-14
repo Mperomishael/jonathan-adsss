@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
+import { useUserAuth } from '@/components/user/UserAuthProvider'
 
 interface Product {
   id: string
@@ -44,19 +45,41 @@ export default function ProductDetailPage() {
     loadProduct()
   }, [productId])
 
+  const { user, getToken } = useUserAuth()
+  const [orderMsg, setOrderMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
   const handleAddToCart = async () => {
+    if (!product) return
     setAdding(true)
+    setOrderMsg(null)
     try {
+      const token = getToken ? await getToken() : null
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers.Authorization = `Bearer ${token}`
+
       const res = await fetch('/api/cart/add', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, quantity }),
+        headers,
+        body: JSON.stringify({
+          productId: product.id,
+          quantity,
+          productName: product.name,
+          unitPrice: product.price,
+          image: product.image,
+          email: user?.email || '',
+        }),
       })
+      const data = await res.json()
       if (res.ok) {
-        alert('Added to cart!')
+        setOrderMsg({
+          type: 'ok',
+          text: data.message || 'Order placed! Admin will review and may award reward points.',
+        })
+      } else {
+        setOrderMsg({ type: 'err', text: data.error || 'Failed to place order' })
       }
-    } catch (err) {
-      alert('Failed to add to cart')
+    } catch (err: any) {
+      setOrderMsg({ type: 'err', text: err.message || 'Failed to place order' })
     } finally {
       setAdding(false)
     }
@@ -180,6 +203,19 @@ export default function ProductDetailPage() {
                     </>
                   )}
                 </button>
+
+                {orderMsg && (
+                  <div className={`mt-3 text-sm rounded-lg px-3 py-2 ${
+                    orderMsg.type === 'ok'
+                      ? 'bg-green-900/30 text-green-400 border border-green-800/40'
+                      : 'bg-red-900/30 text-red-400 border border-red-800/40'
+                  }`}>
+                    {orderMsg.text}
+                    {orderMsg.type === 'ok' && (
+                      <a href="/dashboard" className="underline ml-2">View dashboard</a>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
