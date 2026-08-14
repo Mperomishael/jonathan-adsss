@@ -70,6 +70,15 @@ export interface SiteSettings {
 
 // ─── DB helper ────────────────────────────────────────────────────────────────
 
+/** Remove keys whose value is undefined — Firestore rejects undefined. */
+function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) out[k] = v
+  }
+  return out as T
+}
+
 export function getDb() {
   if (!adminDb) {
     throw new Error('Firebase admin is not initialized. Check FIREBASE_ADMIN_* environment variables.')
@@ -319,6 +328,9 @@ export interface Payment {
   transactionId?: string
   shippingAddress?: string
   waybill?: boolean
+  proofUrl?: string
+  pointsAwarded?: number
+  pointsAwardedAt?: string
   createdAt: string
   updatedAt: string
 }
@@ -438,18 +450,19 @@ export async function getUserByEmail(email: string): Promise<User | null> {
 
 export async function createUser(email: string, googleId?: string): Promise<User> {
   const now = new Date().toISOString()
-  const ref = await getDb().collection('users').add({
-    email,
-    googleId,
+  const payload = stripUndefined({
+    email: email.toLowerCase().trim(),
+    googleId: googleId || undefined, // omitted when empty
     whitelisted: false,
-    fanStatus: 'pending',
+    fanStatus: 'pending' as const,
     registeredAt: now,
-    paymentStatus: 'unpaid',
+    paymentStatus: 'unpaid' as const,
   })
+  const ref = await getDb().collection('users').add(payload)
   return {
     id: ref.id,
-    email,
-    googleId,
+    email: payload.email as string,
+    googleId: (payload.googleId as string | undefined),
     whitelisted: false,
     fanStatus: 'pending',
     registeredAt: now,
@@ -458,7 +471,10 @@ export async function createUser(email: string, googleId?: string): Promise<User
 }
 
 export async function updateUser(id: string, data: Partial<User>): Promise<void> {
-  await getDb().collection('users').doc(id).update(data)
+  const payload = stripUndefined({ ...data }) as Record<string, unknown>
+  delete payload.id
+  if (Object.keys(payload).length === 0) return
+  await getDb().collection('users').doc(id).update(payload)
 }
 
 export async function whitelistUser(userId: string, _admin: string): Promise<void> {
@@ -493,12 +509,13 @@ export async function createPayment(
   data: Omit<Payment, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<Payment> {
   const now = new Date().toISOString()
-  const ref = await getDb().collection('payments').add({
+  const payload = stripUndefined({
     ...data,
     createdAt: now,
     updatedAt: now,
-  })
-  return { id: ref.id, ...data, createdAt: now, updatedAt: now }
+  } as Record<string, unknown>)
+  const ref = await getDb().collection('payments').add(payload)
+  return { id: ref.id, ...(payload as any) }
 }
 
 export async function confirmPayment(paymentId: string, transactionId: string): Promise<void> {
@@ -510,10 +527,12 @@ export async function confirmPayment(paymentId: string, transactionId: string): 
 }
 
 export async function updatePayment(id: string, data: Partial<Payment>): Promise<void> {
-  await getDb().collection('payments').doc(id).update({
+  const payload = stripUndefined({
     ...data,
     updatedAt: new Date().toISOString(),
-  })
+  } as Record<string, unknown>)
+  delete payload.id
+  await getDb().collection('payments').doc(id).update(payload)
 }
 
 // ─── Crypto Wallets (pageSettings/cryptoWallets) ──────────────────────────────
