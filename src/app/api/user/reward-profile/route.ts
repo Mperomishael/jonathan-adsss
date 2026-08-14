@@ -37,7 +37,13 @@ export async function GET(request: NextRequest) {
     }
 
     const db = getDb()
-    const doc = await db.collection('rewards').doc(verified.uid).get()
+    // Prefer Auth uid; fall back to email so admin-awarded points always show
+    let doc = await db.collection('rewards').doc(verified.uid).get()
+
+    if (!doc.exists && verified.email) {
+      const emailKey = verified.email.toLowerCase().trim()
+      doc = await db.collection('rewards').doc(emailKey).get()
+    }
 
     if (doc.exists) {
       return NextResponse.json(doc.data())
