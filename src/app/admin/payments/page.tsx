@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { DollarSign, Check, X, Clock, ExternalLink } from 'lucide-react'
+import { DollarSign, Check, X, Clock, ExternalLink, Gift } from 'lucide-react'
 import { useAdminAuth } from '@/components/admin/AdminAuthProvider'
 
 interface Payment {
@@ -20,6 +20,7 @@ interface Payment {
   shippingAddress?: string
   createdAt: string
   updatedAt?: string
+  pointsAwarded?: number
 }
 
 export default function PaymentsPage() {
@@ -30,6 +31,7 @@ export default function PaymentsPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [selectedPayment, setSelectedPayment] = useState<string | null>(null)
   const [txId, setTxId] = useState('')
+  const [pointsInput, setPointsInput] = useState('')
 
   useEffect(() => {
     loadPayments()
@@ -60,6 +62,10 @@ export default function PaymentsPage() {
       return
     }
 
+    const points = Number(pointsInput)
+    const pointsToSend =
+      Number.isFinite(points) && points > 0 ? Math.floor(points) : undefined
+
     try {
       const token = await getToken()
       const res = await fetch('/api/admin/payments/confirm', {
@@ -68,24 +74,45 @@ export default function PaymentsPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ paymentId, transactionId: txId.trim() }),
+        body: JSON.stringify({
+          paymentId,
+          transactionId: txId.trim(),
+          points: pointsToSend,
+          pointsDescription: pointsToSend
+            ? `Reward points for confirmed payment`
+            : undefined,
+        }),
       })
+
+      const data = await res.json().catch(() => ({}))
 
       if (res.ok) {
         setPayments((prev) =>
           prev.map((p) =>
             p.id === paymentId
-              ? { ...p, status: 'confirmed', transactionId: txId.trim() }
+              ? {
+                  ...p,
+                  status: 'confirmed' as const,
+                  transactionId: txId.trim(),
+                  pointsAwarded: data.pointsAwarded || pointsToSend || 0,
+                }
               : p
           )
         )
-        setMessage({ type: 'success', text: 'Payment confirmed — user can be whitelisted' })
+        const ptsMsg =
+          data.pointsAwarded > 0
+            ? ` + ${data.pointsAwarded} points awarded`
+            : ' (no points — leave empty for none)'
+        setMessage({
+          type: 'success',
+          text: (data.message || 'Payment confirmed & user approved') + ptsMsg,
+        })
         setSelectedPayment(null)
         setTxId('')
-        setTimeout(() => setMessage(null), 3000)
+        setPointsInput('')
+        setTimeout(() => setMessage(null), 4000)
       } else {
-        const err = await res.json().catch(() => ({}))
-        setMessage({ type: 'error', text: err.error || 'Failed to confirm payment' })
+        setMessage({ type: 'error', text: data.error || 'Failed to confirm payment' })
       }
     } catch {
       setMessage({ type: 'error', text: 'Failed to confirm payment' })
@@ -198,6 +225,11 @@ export default function PaymentsPage() {
                           {payment.tier}
                         </span>
                       )}
+                      {!!payment.pointsAwarded && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-900/40 text-purple-300 tracking-wider">
+                          +{payment.pointsAwarded} pts
+                        </span>
+                      )}
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
                           payment.status === 'confirmed'
@@ -271,21 +303,37 @@ export default function PaymentsPage() {
                       <p className="text-sm text-gray-400">
                         Confirm after verifying the proof:
                       </p>
-                      <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="space-y-2">
                         <input
                           type="text"
                           value={txId}
                           onChange={(e) => setTxId(e.target.value)}
-                          placeholder="Transaction / reference ID"
-                          className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
+                          placeholder="Transaction / reference ID *"
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30"
                         />
-                        <button
-                          type="button"
-                          onClick={() => handleConfirmPayment(payment.id)}
-                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold"
-                        >
-                          Confirm payment
-                        </button>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <div className="flex items-center gap-2 flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2">
+                            <Gift size={14} className="text-purple-400 flex-shrink-0" />
+                            <input
+                              type="number"
+                              min={0}
+                              value={pointsInput}
+                              onChange={(e) => setPointsInput(e.target.value)}
+                              placeholder="Points to award (optional)"
+                              className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-gray-600 min-w-0"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmPayment(payment.id)}
+                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap"
+                          >
+                            Approve & confirm
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-gray-500">
+                          Points are manual — enter amount only if you want to reward this user. Leave blank for 0.
+                        </p>
                       </div>
                     </div>
                   )}
