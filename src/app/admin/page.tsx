@@ -1,253 +1,211 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
   ShoppingBag,
-  RefreshCw,
-  Check,
-  X,
+  CreditCard,
+  Users,
   Gift,
+  ArrowRight,
   Clock,
   Loader2,
 } from 'lucide-react'
 import { useAdminAuth } from '@/components/admin/AdminAuthProvider'
-import { ListSkeleton } from '@/components/ui/SkeletonLoader'
 
 interface StoreOrder {
   id: string
-  productId: string
   productName: string
   quantity: number
-  unitPrice: number
   total: number
-  currency: string
-  image?: string
-  userId?: string | null
   email?: string
-  name?: string
+  userId?: string | null
   status: 'pending' | 'approved' | 'rejected'
-  pointsAwarded?: number
   createdAt: string
-  updatedAt?: string
 }
 
-export default function AdminStoreOrdersPage() {
-  const { getToken } = useAdminAuth()
-  const [orders, setOrders] = useState<StoreOrder[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending')
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [actionId, setActionId] = useState<string | null>(null)
-  const [pointsInput, setPointsInput] = useState<Record<string, string>>({})
+interface PaymentRow {
+  id: string
+  email?: string
+  amount: number
+  currency: string
+  status: 'pending' | 'confirmed' | 'failed'
+}
 
-  const load = async () => {
-    setLoading(true)
-    try {
-      const token = await getToken()
-      const res = await fetch(`/api/admin/store-orders?status=${filter}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setOrders(data.orders || [])
-      }
-    } catch (e) {
-      console.error(e)
-      setMessage({ type: 'error', text: 'Failed to load store orders' })
-    } finally {
-      setLoading(false)
-    }
-  }
+interface UserRow {
+  id: string
+  whitelisted: boolean
+  paymentStatus: string
+}
+
+export default function AdminDashboardHome() {
+  const { getToken, user } = useAdminAuth()
+  const [loading, setLoading] = useState(true)
+  const [pendingOrders, setPendingOrders] = useState<StoreOrder[]>([])
+  const [pendingPaymentsCount, setPendingPaymentsCount] = useState(0)
+  const [totalUsers, setTotalUsers] = useState(0)
+  const [whitelistedCount, setWhitelistedCount] = useState(0)
 
   useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter])
+    ;(async () => {
+      setLoading(true)
+      try {
+        const token = await getToken()
+        const headers = { Authorization: `Bearer ${token}` }
 
-  const handleAction = async (orderId: string, action: 'approve' | 'reject') => {
-    setActionId(orderId)
-    setMessage(null)
-    try {
-      const token = await getToken()
-      const points = action === 'approve' ? Number(pointsInput[orderId] || 0) : 0
-      const res = await fetch('/api/admin/store-orders', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          orderId,
-          action,
-          points: points > 0 ? points : undefined,
-          description:
-            points > 0
-              ? `Reward points for approved purchase`
-              : undefined,
-        }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        setMessage({
-          type: 'success',
-          text: data.message || (action === 'approve' ? 'Order approved' : 'Order rejected'),
-        })
-        await load()
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Action failed' })
+        const [ordersRes, paymentsRes, usersRes] = await Promise.all([
+          fetch('/api/admin/store-orders?status=pending', { headers }).catch(() => null),
+          fetch('/api/admin/payments', { headers }).catch(() => null),
+          fetch('/api/admin/users', { headers }).catch(() => null),
+        ])
+
+        if (ordersRes?.ok) {
+          const data = await ordersRes.json()
+          setPendingOrders((data.orders || []).slice(0, 6))
+        }
+
+        if (paymentsRes?.ok) {
+          const payments: PaymentRow[] = await paymentsRes.json()
+          setPendingPaymentsCount(payments.filter((p) => p.status === 'pending').length)
+        }
+
+        if (usersRes?.ok) {
+          const users: UserRow[] = await usersRes.json()
+          setTotalUsers(users.length)
+          setWhitelistedCount(users.filter((u) => u.whitelisted).length)
+        }
+      } catch (err) {
+        console.error('[Admin Dashboard] load error:', err)
+      } finally {
+        setLoading(false)
       }
-    } catch (e: any) {
-      setMessage({ type: 'error', text: e.message || 'Action failed' })
-    } finally {
-      setActionId(null)
-    }
-  }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const statusColor = (s: string) =>
-    ({
-      pending: 'text-yellow-400 bg-yellow-900/30',
-      approved: 'text-green-400 bg-green-900/30',
-      rejected: 'text-red-400 bg-red-900/30',
-    }[s] || 'text-gray-400 bg-white/5')
+  const stats = [
+    {
+      label: 'PENDING STORE ORDERS',
+      value: pendingOrders.length,
+      icon: ShoppingBag,
+      color: 'text-yellow-400',
+      href: '/admin/store-orders',
+    },
+    {
+      label: 'PENDING PAYMENTS',
+      value: pendingPaymentsCount,
+      icon: CreditCard,
+      color: 'text-blue-400',
+      href: '/admin/payments',
+    },
+    {
+      label: 'WHITELISTED FANS',
+      value: whitelistedCount,
+      icon: Users,
+      color: 'text-green-400',
+      href: '/admin/users',
+    },
+    {
+      label: 'TOTAL USERS',
+      value: totalUsers,
+      icon: Users,
+      color: 'text-gray-300',
+      href: '/admin/users',
+    },
+  ]
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
-        <div>
-          <h1 className="text-white text-xl sm:text-2xl font-black tracking-widest">
-            STORE ORDERS
-          </h1>
-          <p className="text-gray-500 text-xs sm:text-sm mt-1">
-            Approve purchases and assign reward points
-          </p>
-        </div>
-        <button
-          onClick={load}
-          className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-white px-4 py-2.5 rounded-xl text-sm transition-colors w-full sm:w-auto"
-        >
-          <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
-
-      {message && (
-        <div
-          className={`mb-4 px-4 py-3 rounded-xl text-sm ${
-            message.type === 'success'
-              ? 'bg-green-900/30 text-green-400 border border-green-800/50'
-              : 'bg-red-900/30 text-red-400 border border-red-800/50'
-          }`}
-        >
-          {message.text}
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        {(['pending', 'approved', 'rejected', 'all'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors ${
-              filter === f
-                ? 'bg-red-600 text-white'
-                : 'bg-white/5 text-gray-400 hover:bg-white/10'
-            }`}
-          >
-            {f.toUpperCase()}
-          </button>
-        ))}
+    <div>
+      <div className="mb-8">
+        <h1 className="text-white text-2xl font-black tracking-widest">DASHBOARD</h1>
+        <p className="text-gray-500 text-sm mt-1">
+          {user?.email ? `Welcome back, ${user.email}` : 'Overview of what needs your attention'}
+        </p>
       </div>
 
       {loading ? (
-        <ListSkeleton rows={6} />
-      ) : orders.length === 0 ? (
-        <div className="text-center py-16 bg-white/3 border border-white/10 rounded-2xl">
-          <ShoppingBag size={36} className="text-gray-600 mx-auto mb-3" />
-          <p className="text-gray-400 text-sm">No {filter === 'all' ? '' : filter} store orders</p>
+        <div className="flex items-center justify-center h-40">
+          <Loader2 size={28} className="text-red-500 animate-spin" />
         </div>
       ) : (
-        <div className="space-y-3">
-          {orders.map((order, i) => (
-            <motion.div
-              key={order.id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
-              className="bg-white/3 border border-white/10 rounded-2xl p-4 sm:p-5"
-            >
-              <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${statusColor(
-                        order.status
-                      )}`}
-                    >
-                      {order.status === 'pending' && <Clock size={10} />}
-                      {order.status === 'approved' && <Check size={10} />}
-                      {order.status === 'rejected' && <X size={10} />}
-                      {order.status.toUpperCase()}
-                    </span>
-                    {order.pointsAwarded ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-900/30 text-purple-300">
-                        <Gift size={10} /> +{order.pointsAwarded} pts
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="text-white font-bold text-sm sm:text-base truncate">
-                    {order.productName}
-                  </p>
-                  <p className="text-gray-400 text-xs mt-1">
-                    Qty {order.quantity} · ${Number(order.unitPrice).toFixed(2)} each ·{' '}
-                    <span className="text-white font-semibold">${Number(order.total).toFixed(2)}</span>
-                  </p>
-                  <p className="text-gray-500 text-xs mt-1 truncate">
-                    {order.email || order.userId || 'Guest'} ·{' '}
-                    {order.createdAt ? new Date(order.createdAt).toLocaleString() : '—'}
-                  </p>
-                </div>
+        <>
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+            {stats.map((s) => (
+              <Link key={s.label} href={s.href}>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white/3 border border-white/5 rounded-xl p-4 hover:border-white/10 transition-colors h-full"
+                >
+                  <s.icon size={18} className={`${s.color} mb-3`} />
+                  <p className="text-white text-2xl font-black">{s.value}</p>
+                  <p className="text-gray-500 text-[10px] tracking-widest mt-1">{s.label}</p>
+                </motion.div>
+              </Link>
+            ))}
+          </div>
 
-                {order.status === 'pending' && (
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto">
-                    <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2">
-                      <Gift size={14} className="text-purple-400 flex-shrink-0" />
-                      <input
-                        type="number"
-                        min={0}
-                        placeholder="Points"
-                        value={pointsInput[order.id] || ''}
-                        onChange={(e) =>
-                          setPointsInput((prev) => ({ ...prev, [order.id]: e.target.value }))
-                        }
-                        className="bg-transparent text-white text-sm w-20 outline-none placeholder:text-gray-600"
-                      />
-                    </div>
-                    <button
-                      disabled={actionId === order.id}
-                      onClick={() => handleAction(order.id, 'approve')}
-                      className="flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                    >
-                      {actionId === order.id ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <Check size={14} />
-                      )}
-                      Approve
-                    </button>
-                    <button
-                      disabled={actionId === order.id}
-                      onClick={() => handleAction(order.id, 'reject')}
-                      className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-red-900/40 border border-white/10 text-red-400 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                    >
-                      <X size={14} /> Reject
-                    </button>
-                  </div>
-                )}
+          {/* Pending store orders preview */}
+          <div className="bg-white/3 border border-white/10 rounded-2xl p-5 sm:p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-white text-sm font-black tracking-widest flex items-center gap-2">
+                <ShoppingBag size={16} className="text-yellow-400" />
+                PENDING STORE ORDERS
+              </h2>
+              <Link
+                href="/admin/store-orders"
+                className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1 font-semibold"
+              >
+                Review all <ArrowRight size={12} />
+              </Link>
+            </div>
+
+            {pendingOrders.length === 0 ? (
+              <div className="text-center py-10">
+                <ShoppingBag size={28} className="text-gray-600 mx-auto mb-2" />
+                <p className="text-gray-500 text-sm">No pending store orders right now</p>
               </div>
-            </motion.div>
-          ))}
-        </div>
+            ) : (
+              <div className="space-y-2">
+                {pendingOrders.map((o) => (
+                  <div
+                    key={o.id}
+                    className="flex items-center justify-between gap-3 bg-white/3 border border-white/5 rounded-lg px-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-white text-sm font-semibold truncate">{o.productName}</p>
+                      <p className="text-gray-500 text-xs truncate">
+                        {o.email || o.userId || 'Guest'} · Qty {o.quantity} · $
+                        {Number(o.total).toFixed(2)}
+                      </p>
+                    </div>
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-yellow-400 bg-yellow-900/30 px-2 py-1 rounded flex-shrink-0">
+                      <Clock size={10} /> PENDING
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Quick links */}
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/admin/users"
+              className="flex items-center gap-2 bg-purple-900/20 border border-purple-800/50 text-purple-300 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-purple-900/40 transition-colors"
+            >
+              <Gift size={14} /> Add Points to a User
+            </Link>
+            <Link
+              href="/admin/card-downloads"
+              className="flex items-center gap-2 bg-white/5 border border-white/10 text-gray-300 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-white/10 transition-colors"
+            >
+              <CreditCard size={14} /> Download a Fan Card
+            </Link>
+          </div>
+        </>
       )}
     </div>
   )
