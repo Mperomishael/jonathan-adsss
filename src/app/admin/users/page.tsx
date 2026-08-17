@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { User, CheckCircle, XCircle, Shield, MoreVertical } from 'lucide-react'
+import { User, CheckCircle, XCircle, Gift, Loader2, X } from 'lucide-react'
 import { useAdminAuth } from '@/components/admin/AdminAuthProvider'
 
 interface UserData {
@@ -20,6 +20,12 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'whitelisted' | 'pending' | 'paid'>('all')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Add-points modal state
+  const [pointsModalUser, setPointsModalUser] = useState<UserData | null>(null)
+  const [pointsAmount, setPointsAmount] = useState('')
+  const [pointsDescription, setPointsDescription] = useState('Bonus points from admin')
+  const [awarding, setAwarding] = useState(false)
 
   useEffect(() => {
     loadUsers()
@@ -68,6 +74,61 @@ export default function UsersPage() {
     }
   }
 
+  const openPointsModal = (user: UserData) => {
+    setPointsModalUser(user)
+    setPointsAmount('')
+    setPointsDescription('Bonus points from admin')
+  }
+
+  const closePointsModal = () => {
+    if (awarding) return
+    setPointsModalUser(null)
+  }
+
+  const handleAwardPoints = async () => {
+    if (!pointsModalUser) return
+    const amount = Number(pointsAmount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMessage({ type: 'error', text: 'Enter a valid points amount greater than 0' })
+      return
+    }
+
+    setAwarding(true)
+    setMessage(null)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/admin/rewards', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          userId: pointsModalUser.id,
+          email: pointsModalUser.email,
+          amount,
+          description: pointsDescription || 'Bonus points from admin',
+          // No orderId — this is a manual award, not tied to any purchase
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setMessage({
+          type: 'success',
+          text: `Awarded ${amount} points to ${pointsModalUser.email}`,
+        })
+        setPointsModalUser(null)
+        setTimeout(() => setMessage(null), 4000)
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to award points' })
+      }
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Failed to award points' })
+    } finally {
+      setAwarding(false)
+    }
+  }
+
   const filteredUsers = users.filter((u) => {
     if (filter === 'whitelisted') return u.whitelisted
     if (filter === 'pending') return !u.whitelisted
@@ -96,7 +157,9 @@ export default function UsersPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-white text-2xl font-black tracking-widest">USERS & WHITELIST</h1>
-        <p className="text-gray-500 text-sm mt-1">Manage user access and whitelist fan accounts</p>
+        <p className="text-gray-500 text-sm mt-1">
+          Manage user access, whitelist fan accounts, and award points manually — with or without a purchase
+        </p>
       </div>
 
       {/* Message */}
@@ -172,6 +235,13 @@ export default function UsersPage() {
 
                 <div className="flex gap-2 w-full sm:w-auto">
                   <button
+                    onClick={() => openPointsModal(user)}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-purple-900/20 text-purple-300 hover:bg-purple-900/40 border border-purple-800/50"
+                  >
+                    <Gift size={13} />
+                    Add Points
+                  </button>
+                  <button
                     onClick={() => handleWhitelist(user.id, !user.whitelisted)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex-1 sm:flex-none ${
                       user.whitelisted
@@ -207,6 +277,72 @@ export default function UsersPage() {
           <p className="text-blue-400 text-xl sm:text-2xl font-black">{users.filter((u) => u.paymentStatus === 'confirmed').length}</p>
         </div>
       </div>
+
+      {/* Add Points Modal */}
+      {pointsModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-[#111] border border-white/10 rounded-2xl p-6 w-full max-w-sm"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-black tracking-widest text-sm flex items-center gap-2">
+                <Gift size={16} className="text-purple-400" />
+                ADD POINTS
+              </h3>
+              <button onClick={closePointsModal} className="text-gray-500 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-gray-400 text-xs mb-4 truncate">
+              Manually award points to <span className="text-white">{pointsModalUser.email}</span> —
+              no purchase required.
+            </p>
+
+            <label className="block text-gray-400 text-xs tracking-widest mb-2">POINTS AMOUNT</label>
+            <input
+              type="number"
+              min={1}
+              autoFocus
+              value={pointsAmount}
+              onChange={(e) => setPointsAmount(e.target.value)}
+              placeholder="e.g. 250"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-purple-500 transition mb-4"
+              disabled={awarding}
+            />
+
+            <label className="block text-gray-400 text-xs tracking-widest mb-2">REASON / DESCRIPTION</label>
+            <input
+              type="text"
+              value={pointsDescription}
+              onChange={(e) => setPointsDescription(e.target.value)}
+              placeholder="Bonus points from admin"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-purple-500 transition mb-6"
+              disabled={awarding}
+            />
+
+            <div className="flex gap-2">
+              <button
+                onClick={closePointsModal}
+                disabled={awarding}
+                className="flex-1 bg-white/5 hover:bg-white/10 text-gray-300 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAwardPoints}
+                disabled={awarding}
+                className="flex-1 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+              >
+                {awarding ? <Loader2 size={16} className="animate-spin" /> : <Gift size={16} />}
+                Award Points
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   )
 }
