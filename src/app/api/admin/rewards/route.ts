@@ -83,13 +83,25 @@ export async function POST(req: NextRequest) {
 
     const db = getDb()
 
-    let resolvedUid = userId || ''
+    // Resolve to the user's real Firebase Auth UID (stored as `googleId` on the
+    // user doc — the `users` collection's own document ID is auto-generated and
+    // is NOT the Auth UID). The dashboard looks up rewards by the real Auth UID
+    // first, so writing anywhere else means points silently never show up.
+    let resolvedUid = ''
     let resolvedEmail = (userEmail || '').toLowerCase().trim()
 
-    if (!resolvedUid && resolvedEmail) {
+    if (userId) {
+      const user = await getUser(userId)
+      if (user) {
+        resolvedUid = (user as any).googleId || user.id
+        resolvedEmail = user.email || resolvedEmail
+      } else {
+        resolvedUid = userId
+      }
+    } else if (resolvedEmail) {
       const user = await getUserByEmail(resolvedEmail)
       if (user) {
-        resolvedUid = user.id
+        resolvedUid = (user as any).googleId || user.id
         resolvedEmail = user.email || resolvedEmail
       }
     }
