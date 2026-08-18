@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Package, Image, CreditCard, Settings, LogOut, Shield, Menu, X, ShoppingBag, Gift } from 'lucide-react'
+import { LayoutDashboard, Package, Image, CreditCard, Settings, LogOut, Shield, Menu, X, ShoppingBag, Gift, Download } from 'lucide-react'
 import { useAdminAuth } from './AdminAuthProvider'
 
 const nav = [
@@ -11,6 +11,7 @@ const nav = [
   { href: '/admin/products', label: 'Products', icon: Package },
   { href: '/admin/gallery', label: 'Gallery', icon: Image },
   { href: '/admin/fan-card', label: 'Fan Card', icon: CreditCard },
+  { href: '/admin/card-downloads', label: 'Card Downloads', icon: Download },
   { href: '/admin/store-orders', label: 'Store Orders', icon: ShoppingBag },
   { href: '/admin/users', label: 'Users & Whitelist', icon: Shield },
   { href: '/admin/payments', label: 'Payments', icon: CreditCard },
