@@ -713,6 +713,10 @@ export default function FanCardPage() {
   const [exportClean, setExportClean] = useState(false)
   const [selectedTier, setSelectedTier] = useState<FanTierId>('regular')
   const [ownedTier, setOwnedTier] = useState<FanTierId | null>(null)
+  // A fan can be "whitelisted" for reasons other than payment (e.g. an admin
+  // toggle or a manual application approval), so downloads are gated on an
+  // actual confirmed payment, not just the whitelisted flag.
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false)
   // Admin-driven prices (USD dollars) — never hardcode display values
   const [adminTiers, setAdminTiers] = useState<Record<
     FanTierId,
@@ -725,7 +729,7 @@ export default function FanCardPage() {
   }>({})
 
   const cardRef = useRef<HTMLDivElement>(null)
-  const canDownload = pageState === 'whitelisted'
+  const canDownload = pageState === 'whitelisted' && paymentConfirmed
 
   // Load admin settings via public API (authoritative) + merge live Firestore updates
   useEffect(() => {
@@ -901,6 +905,33 @@ export default function FanCardPage() {
           const stored = localStorage.getItem('fanCardOwnedTier') as FanTierId | null
           setOwnedTier(stored && ['regular', 'gold', 'diamond'].includes(stored) ? stored : 'regular')
         }
+        // Confirm an actual confirmed payment exists before allowing downloads —
+        // "whitelisted" alone can be set by other admin actions.
+        ;(async () => {
+          try {
+            const token = await getToken()
+            if (!token) return
+            const res = await fetch('/api/user/status', { headers: { Authorization: `Bearer ${token}` } })
+            if (!res.ok) return
+            const data = await res.json()
+            setPaymentConfirmed(data.paymentStatus === 'confirmed')
+          } catch {
+            /* non-fatal — download stays locked if we can't verify */
+          }
+        })()
+        // Restore previously saved card name, if any, so returning fans don't retype it
+        ;(async () => {
+          try {
+            const token = await getToken()
+            if (!token) return
+            const res = await fetch('/api/user/card-preference', { headers: { Authorization: `Bearer ${token}` } })
+            if (!res.ok) return
+            const data = await res.json()
+            if (data.cardName) setCardName((prev) => prev || data.cardName)
+          } catch {
+            /* non-fatal */
+          }
+        })()
       } else {
         ;(async () => {
           try {
@@ -955,8 +986,8 @@ export default function FanCardPage() {
       alert('Enter your name to engrave on the card first.')
       return
     }
-    if (pageState !== 'whitelisted') {
-      alert('Downloads only after payment is verified by admin.')
+    if (!canDownload) {
+      alert('Downloads unlock once your payment is confirmed by admin.')
       return
     }
     if (!cardRef.current) return
@@ -964,6 +995,20 @@ export default function FanCardPage() {
     setExportClean(true)
     await new Promise((r) => setTimeout(r, 120))
     try {
+      // Save the card name so admins can regenerate/download this fan's card too
+      try {
+        const token = await getToken()
+        if (token) {
+          await fetch('/api/user/card-preference', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ cardName: cardName.trim(), fanLevel: selectedTier }),
+          })
+        }
+      } catch {
+        /* non-fatal — PDF export still proceeds */
+      }
+
       const { default: html2canvas } = await import('html2canvas')
       const { jsPDF } = await import('jspdf')
       const node = cardRef.current
