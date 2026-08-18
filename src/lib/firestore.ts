@@ -313,6 +313,9 @@ export interface User {
   registeredAt: string
   paymentStatus: 'unpaid' | 'pending' | 'confirmed'
   fanTier?: FanTierId
+  cardName?: string // Name the fan engraved on their personalized fan card
+  cardMemberId?: string // Deterministic member ID shown on the fan card
+  cardUpdatedAt?: string
 }
 
 export interface Payment {
