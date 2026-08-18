@@ -39,14 +39,42 @@ export async function GET(request: NextRequest) {
     const db = getDb()
     // Prefer Auth uid; fall back to email so admin-awarded points always show
     let doc = await db.collection('rewards').doc(verified.uid).get()
+    let profile = doc.exists ? (doc.data() as any) : null
 
-    if (!doc.exists && verified.email) {
+    // Self-heal: if points were ever written to an email-keyed profile (e.g. from
+    // an older/incorrect write path, or before this uid-keyed profile existed),
+    // merge them in here so a stale/empty uid profile never hides real points.
+    if (verified.email) {
       const emailKey = verified.email.toLowerCase().trim()
-      doc = await db.collection('rewards').doc(emailKey).get()
+      const emailDoc = await db.collection('rewards').doc(emailKey).get()
+      if (emailDoc.exists) {
+        const emailProfile = emailDoc.data() as any
+        if (!profile) {
+          profile = emailProfile
+        } else if (emailKey !== verified.uid) {
+          const existingIds = new Set((profile.rewards || []).map((r: any) => r.id))
+          const newRewards = (emailProfile.rewards || []).filter((r: any) => !existingIds.has(r.id))
+          if (newRewards.length > 0) {
+            const addedPoints = newRewards.reduce((sum: number, r: any) => sum + (r.points || 0), 0)
+            profile.totalPoints = (profile.totalPoints || 0) + addedPoints
+            profile.totalRewards = (profile.totalRewards || 0) + newRewards.length
+            profile.rewards = [...newRewards, ...(profile.rewards || [])]
+            profile.lastActivityAt = new Date().toISOString()
+            if (profile.totalPoints >= 5000) profile.tier = 'platinum'
+            else if (profile.totalPoints >= 2000) profile.tier = 'gold'
+            else if (profile.totalPoints >= 500) profile.tier = 'silver'
+          }
+        }
+        // Persist the healed/merged profile at the canonical uid key so future
+        // reads are fast and consistent, and clear the stray email-keyed copy.
+        if (profile) {
+          await db.collection('rewards').doc(verified.uid).set(profile, { merge: true })
+        }
+      }
     }
 
-    if (doc.exists) {
-      return NextResponse.json(doc.data())
+    if (profile) {
+      return NextResponse.json(profile)
     }
 
     return NextResponse.json({ message: 'Reward profile not found' }, { status: 404 })
